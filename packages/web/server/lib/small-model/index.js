@@ -7,7 +7,7 @@ import { getModelCatalog } from './catalog.js';
 import { resolveSmallModel, parseModelRef, isUsableAuthEntry, getAuthEntryForProvider } from './resolve.js';
 import { DEDICATED_WIRE_FORMAT_PROVIDERS, callSmallModel, resolveProviderLogin } from './call.js';
 import { readMergedSettingsSync } from '../opencode/settings-files.js';
-import { getRuntimeProviderSnapshot } from './runtime-providers.js';
+import { getRuntimeProviderSnapshot, requestOmpSmallModel } from './runtime-providers.js';
 
 // Never a small model, whatever the transport looks like. A plugin can publish
 // an OpenAI-compatible endpoint for Claude Code, but it is a façade over the
@@ -102,6 +102,11 @@ export async function generateSmallModelText({ prompt, system, maxOutputTokens, 
     throw Object.assign(new Error('prompt is required'), { statusCode: 400 });
   }
 
+  if (process.env.OPENCHAMBER_AGENT_RUNTIME === 'omp') return requestOmpSmallModel({
+    action: 'generate', prompt, system, maxOutputTokens, model: model || readSmallModelSettingsOverride() || undefined,
+    preferredProviderID, preferredModelID, restrictToPreferredProvider, responseSchema, timeoutMs, onOverflow, sessionID,
+  }, signal);
+
   const auth = readAuthFile();
   const catalog = await getModelCatalog().catch(() => ({}));
 
@@ -191,6 +196,7 @@ export async function generateSmallModelText({ prompt, system, maxOutputTokens, 
  * only ever fail (e.g. opencode free models without a token).
  */
 export async function listAuthenticatedProviders() {
+  if (process.env.OPENCHAMBER_AGENT_RUNTIME === 'omp') return requestOmpSmallModel({ action: 'providers' });
   try {
     const auth = readAuthFile();
     const ids = new Set(
@@ -265,6 +271,16 @@ const resolveReserveTokens = (outputReserveTokens, limits) => (
 );
 
 export async function describeSmallModel({ directory, preferredProviderID, preferredModelID, outputReserveTokens, overrideModel } = {}) {
+  if (process.env.OPENCHAMBER_AGENT_RUNTIME === 'omp') {
+    const result = await requestOmpSmallModel({ action: 'describe', model: overrideModel || readSmallModelSettingsOverride() || undefined, preferredProviderID, preferredModelID });
+    if (result && outputReserveTokens != null) {
+      const reserve = resolveReserveTokens(outputReserveTokens, result);
+      if (!Number.isSafeInteger(reserve) || reserve < 1) throw new Error('Invalid output token reserve');
+      result.outputTokens = Math.min(reserve, result.outputTokenLimit || reserve, Math.max(1, result.contextTokens - 1));
+      result.inputCharBudget = Math.max(1, result.contextTokens - result.outputTokens) * 4;
+    }
+    return result;
+  }
   const auth = readAuthFile();
   const catalog = await getModelCatalog().catch(() => ({}));
   // A caller with its own model setting (the diff walkthrough) outranks the

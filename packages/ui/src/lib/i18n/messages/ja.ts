@@ -3,7 +3,10 @@ import { settingsDict } from './ja.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
+import { credentialPoolI18n } from './credential-pool.i18n';
+
 export const dict: Record<I18nKey, string> = {
+  ...credentialPoolI18n["ja"],
   'sessions.aiRename.action': 'AIで名前を変更',
   'sessions.aiRename.generating': 'セッション名を生成中...',
   'sessions.aiRename.checking': '完了したやり取りを確認中...',

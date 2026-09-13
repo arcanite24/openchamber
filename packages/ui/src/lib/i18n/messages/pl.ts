@@ -3,7 +3,10 @@ import { settingsDict } from './pl.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
+import { credentialPoolI18n } from './credential-pool.i18n';
+
 export const dict: Record<I18nKey, string> = {
+  ...credentialPoolI18n["pl"],
   'sessions.aiRename.action': 'Zmień nazwę z AI',
   'sessions.aiRename.generating': 'Generowanie tytułu sesji...',
   'sessions.aiRename.checking': 'Sprawdzanie zakończonych wymian...',

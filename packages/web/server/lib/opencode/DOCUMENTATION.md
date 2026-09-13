@@ -3,6 +3,13 @@
 ## Purpose
 This module provides OpenCode server integration utilities for the web server runtime, including configuration management and provider authentication.
 
+In OMP mode, the proxy validates browser Origin against `OPENCHAMBER_PUBLIC_ORIGIN`
+or the local listening port's localhost/127.0.0.1 origins. Cross-site requests are
+rejected. Only after validation does it remove Origin for the private OMP hop,
+which requires its own server password. This protects proxied runtime routes;
+it does not replace the browser server's owner authentication or checks on its
+other feature routes and WebSocket upgrades.
+
 ## Entrypoints and structure
 - `packages/web/server/lib/opencode/index.js`: public entrypoint (currently baseline placeholder).
 - `packages/web/server/lib/opencode/auth.js`: provider authentication file operations.

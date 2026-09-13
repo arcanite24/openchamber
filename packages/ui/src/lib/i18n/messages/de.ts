@@ -2,7 +2,10 @@ import { settingsDict } from './de.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
+import { credentialPoolI18n } from './credential-pool.i18n';
+
 export const dict = {
+  ...credentialPoolI18n["de"],
   'sessions.aiRename.action': 'Mit KI umbenennen',
   'sessions.aiRename.generating': 'Sitzungstitel wird generiert...',
   'sessions.aiRename.checking': 'Abgeschlossene Antworten werden geprüft...',

@@ -15,6 +15,20 @@ import { getWorktreeBootstrapStatus } from '../git/service.js';
 
 const DEFAULT_SSE_HEARTBEAT_INTERVAL_MS = 20_000;
 
+/** Validate browser provenance before converting a request to private OMP transport. */
+export const prepareOmpProxyRequest = (req, res, next) => {
+  const origins = process.env.OPENCHAMBER_PUBLIC_ORIGIN
+    ? [process.env.OPENCHAMBER_PUBLIC_ORIGIN]
+    : [`http://127.0.0.1:${req.socket.localPort}`, `http://localhost:${req.socket.localPort}`];
+  if (req.headers['sec-fetch-site'] === 'cross-site' ||
+      (req.headers.origin !== undefined && !origins.includes(req.headers.origin))) {
+    return res.status(403).json({ error: 'Cross-origin runtime access is forbidden' });
+  }
+  // The upstream requires its private server credential and rejects direct browser requests.
+  delete req.headers.origin;
+  next();
+};
+
 const OPENCODE_AGENT_KEEP_ALIVE_MS = 30_000;
 // Node's own default. A lower cap evicts pooled sockets under concurrency,
 // which reintroduces exactly the per-request connection churn this agent
@@ -693,6 +707,10 @@ export const registerOpenCodeProxy = (app, deps) => {
   };
 
   // Ensure API prefix is detected before proxying
+  app.use('/api', (req, res, next) => {
+    if (process.env.OPENCHAMBER_AGENT_RUNTIME === 'omp') return prepareOmpProxyRequest(req, res, next);
+    next();
+  });
   app.use('/api', (_req, _res, next) => {
     ensureOpenCodeApiPrefix();
     next();

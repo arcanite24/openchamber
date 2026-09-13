@@ -616,6 +616,10 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
         return res.status(400).json({ error: resolved.error });
       }
 
+      if (process.env.OPENCHAMBER_AGENT_RUNTIME === 'omp') {
+        const response = await fetch(buildOpenCodeUrl(`/omp/provider/${encodeURIComponent(providerId)}/source`), { headers: getOpenCodeAuthHeaders() });
+        return res.status(response.status).json(await response.json());
+      }
       const sources = getProviderSources(providerId, directory);
       const { getProviderAuth } = await getAuthLibrary();
       const auth = getProviderAuth(providerId);

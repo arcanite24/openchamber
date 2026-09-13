@@ -49,6 +49,23 @@ export function configureOpenCodeRuntimeProviders(next) {
   resetOpenCodeRuntimeProviders();
 }
 
+/** OMP keeps credential resolution and utility completions behind its private API. */
+export async function requestOmpSmallModel(body, signal) {
+  if (!connection) throw Object.assign(new Error('OMP runtime is not connected'), { statusCode: 503 });
+  const response = await fetch(connection.buildOpenCodeUrl('/omp/small-model', ''), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...connection.getOpenCodeAuthHeaders() },
+    body: JSON.stringify(body),
+    signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(body.timeoutMs ?? 60_000)]),
+  });
+  const result = await response.json();
+  if (!response.ok) throw Object.assign(new Error(result.error || result.data?.message || 'OMP utility request failed'), {
+    statusCode: response.status, code: result.code,
+    requiredChars: result.requiredChars, availableChars: result.availableChars,
+  });
+  return result;
+}
+
 /**
  * Drops every cached answer. OpenCode restarts reload plugins, which can
  * change ports, keys and the provider list itself.

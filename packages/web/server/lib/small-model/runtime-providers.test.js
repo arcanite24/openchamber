@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describeSmallModel } from './index.js';
 
 import {
   ZEN_ANONYMOUS_API_KEY,
@@ -6,6 +7,7 @@ import {
   getRuntimeProvider,
   getRuntimeProviderSnapshot,
   resetOpenCodeRuntimeProviders,
+  requestOmpSmallModel,
 } from './runtime-providers.js';
 
 const providerPayload = (overrides = {}) => ({
@@ -56,6 +58,29 @@ describe('OpenCode runtime provider snapshot', () => {
     configureOpenCodeRuntimeProviders(null);
     resetOpenCodeRuntimeProviders();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('uses OMP limits for numeric and computed output reserves', async () => {
+    vi.stubEnv('OPENCHAMBER_AGENT_RUNTIME', 'omp');
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({
+      contextTokens: 8000, outputTokenLimit: 2000, outputTokens: 2000, inputCharBudget: 24000,
+    })));
+    for (const outputReserveTokens of [1000, () => 1000]) {
+      expect(await describeSmallModel({ overrideModel: 'probe/test', outputReserveTokens }))
+        .toMatchObject({ outputTokens: 1000, inputCharBudget: 28000 });
+    }
+    await expect(describeSmallModel({ overrideModel: 'probe/test', outputReserveTokens: () => 1.5 }))
+      .rejects.toThrow('Invalid output token reserve');
+    expect(fetchMock.mock.calls.every(([url]) => url.endsWith('/omp/small-model'))).toBe(true);
+  });
+
+  it('routes OMP utility calls through the private runtime without credential snapshots', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ text: 'summary', providerID: 'opencode-go', modelID: 'test' }));
+    expect(await requestOmpSmallModel({ action: 'generate', prompt: 'Summarize this' })).toMatchObject({ text: 'summary' });
+    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:4096/omp/small-model');
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({ Authorization: 'Basic test' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ action: 'generate', prompt: 'Summarize this' });
   });
 
   it('reports the credential and endpoint a plugin registered at runtime', async () => {

@@ -40,6 +40,7 @@ import {
   type OAuthAuthMethodEntry,
 } from './providerAuth';
 import { CustomProviderForm } from './CustomProviderForm';
+import { CredentialPoolSettings } from './CredentialPoolSettings';
 import { ProviderOAuthMethods, type ProviderOAuthMethod } from './ProviderOAuthMethods';
 import {
   buildAuthSetRequest,
@@ -638,7 +639,7 @@ export const ProvidersPage: React.FC = () => {
     return (
       <SettingsPageLayout
         title={t('settings.providers.page.connect.title')}
-        showSaveStatus={false}
+        showSaveStatus={candidateProviderId === 'opencode-go'}
       >
         <SettingsSection
           title={t('settings.providers.page.connect.selectProviderTitle')}
@@ -754,7 +755,10 @@ export const ProvidersPage: React.FC = () => {
               </div>
         </SettingsSection>
 
-          {isCustomCreateMode ? (
+          {candidateProviderId === 'opencode-go' ? <CredentialPoolSettings onAdded={() => {
+            void useConfigStore.getState().loadProviders({ directory: settingsDirectory, source: 'credential-pool' });
+            markAuthWriteSucceeded('opencode-go');
+          }} /> : isCustomCreateMode ? (
             <CustomProviderForm
               mode="create"
               existingProviderIDs={connectedProviderIds}
@@ -921,9 +925,9 @@ export const ProvidersPage: React.FC = () => {
       title={selectedProvider.name || selectedProvider.id}
       titleLeading={<ProviderLogo providerId={selectedProvider.id} className="h-5 w-5 shrink-0" />}
       description={<span className="font-mono typography-settings-description text-muted-foreground">{selectedProvider.id}</span>}
-      showSaveStatus={false}
+      showSaveStatus={selectedProvider.id === 'opencode-go'}
     >
-      <SettingsSection
+      {selectedProvider.id === 'opencode-go' ? <CredentialPoolSettings /> : <SettingsSection
         title={t('settings.providers.page.auth.title')}
         divider={false}
         headerAction={(
@@ -1019,7 +1023,7 @@ export const ProvidersPage: React.FC = () => {
                 )}
               </div>
             )}
-      </SettingsSection>
+      </SettingsSection>}
 
 
       <SettingsSection

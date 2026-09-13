@@ -1,5 +1,19 @@
 # Small Model
 
+## OMP runtime
+
+With `OPENCHAMBER_AGENT_RUNTIME=omp`, discovery and generation go through the
+private authenticated `/omp/small-model` runtime endpoint. OMP resolves the
+model and credentials using its shared pool, cooldowns, and bounded failover;
+OpenChamber receives only model summaries and generated output. It never
+fetches a credential-bearing runtime snapshot in this mode. Exhausted pools
+return HTTP 429 with `credential_pool_exhausted` and safe reset information.
+Structured output uses a forced, schema-validated response tool. Selection uses
+an explicit browser override, OMP's `smol` role, the session model, then OMP's
+default role. It does not search other providers for paid fallback capacity.
+
+The remaining provider-specific implementation below applies to OpenCode mode.
+
 Server-side direct LLM calls that reuse the user's existing OpenCode provider
 logins (`~/.local/share/opencode/auth.json`). OpenCode uses a "small model"
 internally (titles, summaries) but does not expose it through the SDK or

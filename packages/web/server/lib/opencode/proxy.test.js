@@ -8,7 +8,27 @@ import {
   createDirectoryQueryCanonicalizer,
   createOpenCodeProxyAgent,
   normalizeForwardedDirectoryHeaders,
+  prepareOmpProxyRequest,
 } from './proxy.js';
+
+describe('OMP private proxy boundary', () => {
+  it('removes allowed local origins and rejects spoofed origins or cross-site requests', () => {
+    for (const origin of ['http://127.0.0.1:4408', 'http://localhost:4408', 'https://attacker.test', 'http://127.0.0.1:9999']) {
+      const req = { headers: { origin }, socket: { localPort: 4408 } };
+      let status;
+      let forwarded = false;
+      const res = { status(value) { status = value; return this; }, json() {} };
+      prepareOmpProxyRequest(req, res, () => { forwarded = true; });
+      expect(forwarded).toBe(origin.endsWith(':4408'));
+      if (forwarded) expect(req.headers.origin).toBeUndefined();
+      else expect(status).toBe(403);
+    }
+    let rejected;
+    const res = { status(value) { rejected = value; return this; }, json() {} };
+    prepareOmpProxyRequest({ headers: { 'sec-fetch-site': 'cross-site' }, socket: { localPort: 4408 } }, res, () => { throw new Error('Must reject'); });
+    expect(rejected).toBe(403);
+  });
+});
 
 describe('createDirectoryQueryCanonicalizer', () => {
   it('canonicalizes directory query params and preserves other params', async () => {

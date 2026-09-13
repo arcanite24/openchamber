@@ -3,7 +3,10 @@ import { settingsDict } from './ko.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
+import { credentialPoolI18n } from './credential-pool.i18n';
+
 export const dict: Record<I18nKey, string> = {
+  ...credentialPoolI18n["ko"],
   'sessions.aiRename.action': 'AI로 이름 변경',
   'sessions.aiRename.generating': '세션 제목 생성 중...',
   'sessions.aiRename.checking': '완료된 대화 확인 중...',
