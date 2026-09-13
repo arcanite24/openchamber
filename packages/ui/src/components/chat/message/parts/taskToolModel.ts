@@ -25,6 +25,15 @@ export const readTaskSessionIdFromRecord = (value: unknown): string | undefined 
     return normalizeSessionIdCandidate(record.sessionID) ?? normalizeSessionIdCandidate(record.sessionId);
 };
 
+export const readTaskSessionIdsFromRecord = (value: unknown): string[] => {
+    if (!value || typeof value !== 'object') return [];
+    const record = value as Record<string, unknown>;
+    const candidates = Array.isArray(record.sessionIDs) ? record.sessionIDs : [];
+    const ids = candidates.map(normalizeSessionIdCandidate).filter((id): id is string => !!id);
+    const single = readTaskSessionIdFromRecord(value);
+    return [...new Set(single ? [single, ...ids] : ids)];
+};
+
 export const normalizeTaskSummaryEntries = (value: unknown): TaskToolSummaryEntry[] => {
     if (!Array.isArray(value)) return [];
 

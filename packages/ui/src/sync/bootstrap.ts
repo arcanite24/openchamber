@@ -141,6 +141,7 @@ export async function bootstrapDirectory(input: {
   }
   const state = getState()
   const loading = state.status !== "complete"
+  let sessionScopedMcp = false
 
   // Seed from global state while we fetch directory-specific data
   const seededProject = projectID(directory, g.projects)
@@ -162,6 +163,7 @@ export async function bootstrapDirectory(input: {
       : retry(() => sdk.project.current().then((x) => commit({ project: unwrap(x, "project.current").id }))),
     retry(() => sdk.config.get().then((x) => {
       const config = unwrap(x, "config.get")
+      sessionScopedMcp = x.response?.headers?.get("X-OMP-MCP-Scope") === "session"
       if (commit({ config })) emitSyncConfigChanged(directory, config)
     })),
     retry(() =>
@@ -207,7 +209,8 @@ export async function bootstrapDirectory(input: {
   // ---------------------------------------------------------------------------
   const runDeferredPhase = () => Promise.allSettled([
     retry(() => sdk.command.list().then((x) => commit({ command: unwrap(x, "command.list") }))),
-    retry(() => sdk.mcp.status().then((x) => commit({ mcp: unwrap(x, "mcp.status") }))),
+    // OMP connections belong to sessions; WorkStatusMcpSection reads their status.
+    sessionScopedMcp ? Promise.resolve() : retry(() => sdk.mcp.status().then((x) => commit({ mcp: unwrap(x, "mcp.status") }))),
     retry(() => sdk.lsp.status().then((x) => commit({ lsp: unwrap(x, "lsp.status") }))),
     retry(() =>
       sdk.vcs.get().then((x) => {

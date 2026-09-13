@@ -27,7 +27,7 @@ Use this doc when you ask an agent to change tool/header/description behavior.
 
 - `taskToolModel.ts`
   - Owns Task metadata parsing and child-session summary projection.
-  - `part.state.metadata.sessionId` is the only live identity contract between a Task and its child session.
+  - `part.state.metadata.sessionId` (or `sessionID`) joins a Task to its child. OMP batch tasks additionally publish `sessionIDs`; the renderer provides a separate navigation control for each validated, unique child ID. The single ID remains the primary summary source for compatibility.
   - A running Task may briefly have no `sessionId`; render it as waiting until the authoritative part update arrives. Never match parallel children by order, title, timestamp, or status.
   - Part-level metadata and output parsing exist only for older persisted records and never override state metadata.
 

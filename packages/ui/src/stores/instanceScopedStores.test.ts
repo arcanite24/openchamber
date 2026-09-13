@@ -89,4 +89,20 @@ describe('instance-scoped stores reject responses from the previous instance', (
 
     expect(useSkillsStore.getState().skillsByDirectory['/repo']).toBe(undefined);
   });
+
+  test('a failed MCP response preserves the last successful status', async () => {
+    const first = useMcpStore.getState().refresh({ directory: '/repo', silent: true });
+    mcpStatusResponse.resolve(mcpStatusResult(connectedServer('server-a')));
+    await first;
+    mcpStatusResponse = deferred();
+    const failed = useMcpStore.getState().refresh({ directory: '/repo', silent: true });
+    mcpStatusResponse.resolve({
+      data: undefined,
+      error: { name: 'BadRequest', data: { message: 'Unavailable' } }, request: new Request('http://localhost/mcp'),
+      response: new Response(null, { status: 503 }),
+    });
+    await failed;
+    expect(Object.keys(useMcpStore.getState().getStatusForDirectory('/repo'))).toEqual(['server-a']);
+    expect(useMcpStore.getState().getErrorForDirectory('/repo')).toBe('Failed to load MCP status');
+  });
 });

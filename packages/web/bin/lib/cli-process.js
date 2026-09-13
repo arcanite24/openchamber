@@ -101,6 +101,7 @@ function isProcessRunning(pid) {
 // null when identity can't be determined on this platform (caller falls back to
 // liveness — so behaviour is unchanged where we can't check).
 function readProcessCmdline(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null;
   try {
     if (process.platform === 'linux') {
       // /proc/<pid>/cmdline is a NUL-delimited argv list.
@@ -115,10 +116,17 @@ function readProcessCmdline(pid) {
       const out = (result.stdout || '').trim();
       return out.length > 0 ? out : null;
     }
+    if (process.platform === 'win32') {
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        `(Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}' -ErrorAction Stop).CommandLine`,
+      ], { encoding: 'utf8', timeout: 3000, windowsHide: true, maxBuffer: 64 * 1024 });
+      if (result.error || result.status !== 0) return null;
+      return (result.stdout || '').trim() || null;
+    }
   } catch {
     return null;
   }
-  // Windows / other: a process's full command line isn't cheaply available, so
+  // Other platforms: a process's full command line isn't available, so
   // we can't verify identity — fall back to liveness-only.
   return null;
 }
@@ -141,7 +149,7 @@ function isOpenchamberCmdline(cmdline) {
 // removePidFile never runs, so the stale PID can be recycled to an unrelated
 // process; a liveness-only check then reports us as "already running" and aborts
 // startup, which loops forever under systemd Restart=always (issue #1721).
-// Where identity can't be determined (Windows, unreadable /proc or ps), we fall
+// Where identity can't be determined (unreadable /proc, ps or CIM), we fall
 // back to liveness so there are no false negatives on those platforms.
 function isOpenchamberProcessRunning(pid) {
   const state = getOpenchamberProcessState(pid);

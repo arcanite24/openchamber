@@ -1,5 +1,6 @@
 import type { I18nKey } from '@/lib/i18n/store';
 import { useUIStore } from '@/stores/useUIStore';
+import { useConfigStore } from '@/stores/useConfigStore';
 import type { SettingsPageSlug, SettingsRuntimeContext } from './metadata';
 import { getSettingsPageMeta } from './metadata';
 
@@ -795,6 +796,13 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['prompt', 'template', 'arguments', 'shell', 'file'],
   },
   {
+    id: 'mcp.native',
+    page: 'mcp',
+    titleKey: 'settings.mcp.native.title',
+    descriptionKey: 'settings.mcp.native.hint',
+    keywords: ['server', 'command', 'url', 'environment', 'headers', 'create', 'delete', 'scope'],
+  },
+  {
     id: 'mcp.create',
     page: 'mcp',
     titleKey: 'settings.mcp.sidebar.actions.addServerTitle',
@@ -1107,8 +1115,10 @@ export function buildSettingsSearchResults({
 
   const allowedPages = visiblePageSlugs ? new Set<SettingsPageSlug>(visiblePageSlugs) : null;
   const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const nativeMcp = useConfigStore.getState().agents.some(agent => agent.options?.runtime === 'omp');
 
   return SETTINGS_SEARCH_ITEMS.flatMap((item) => {
+    if (item.page === 'mcp' && (item.id === 'mcp.native') !== nativeMcp) return [];
     if (allowedPages && !allowedPages.has(item.page)) {
       return [];
     }

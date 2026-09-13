@@ -258,7 +258,7 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         {sectionVisible('telemetry') ? <WorkStatusTelemetrySection sessionId={sessionId} directory={directory} /> : null}
         {sectionVisible('subagents') ? <WorkStatusSubagentsSection sessionId={sessionId} directory={directory} /> : null}
         {sectionVisible('tasks') ? <WorkStatusTasksSection sessionId={sessionId} directory={directory} /> : null}
-        {sectionVisible('mcp') ? <WorkStatusMcpSection directory={directory} /> : null}
+        {sectionVisible('mcp') ? <WorkStatusMcpSection directory={directory} sessionId={sessionId} /> : null}
         {sectionVisible('pinned') ? <WorkStatusPinnedSection sessionId={sessionId} directory={directory} /> : null}
         {sectionVisible('contextSources') ? <WorkStatusContextSection sessionId={sessionId} directory={directory} /> : null}
       </ScrollShadow>

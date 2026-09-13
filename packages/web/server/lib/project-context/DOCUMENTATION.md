@@ -127,9 +127,10 @@ and I/O failures are `500`.
   data on disk.
 - **Writes are serialized per project** through an in-process lock, and land via
   write-to-temp + rename so a crash cannot leave a half-written file.
-- **`readContext` never takes the lock.** Every mutator calls it while already
-  holding the lock, so locking there would deadlock. The legacy migration it can
-  trigger is safe unlocked: both writes are atomic renames of identical content.
+- **Public context and plan reads share the write lock.** A first read can
+  migrate legacy data, so it must not race another migration or overwrite a
+  concurrent edit. Internal reads stay unlocked because mutators already hold
+  the lock. This avoids recursive locking while serializing migration and edits.
 - **Plan create writes markdown before the manifest entry**; delete removes the
   manifest entry before the file. Either partial failure leaves an unreferenced
   markdown file, which is inert. The reverse order would leave a manifest entry

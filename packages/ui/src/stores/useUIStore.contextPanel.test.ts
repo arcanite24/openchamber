@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { CONTEXT_SURFACES, sortContextSurfaces } from '../lib/surfaces/registry';
 import { useTerminalStore } from './useTerminalStore';
 import { useUIStore } from './useUIStore';
+import { useFilesViewTabsStore } from './useFilesViewTabsStore';
 
 const getContextPanelTabs = (directory: string) => useUIStore.getState().contextPanelByDirectory[directory]?.tabs ?? [];
 
@@ -14,6 +15,20 @@ beforeEach(() => {
 });
 
 describe('useUIStore context panel tabs', () => {
+  test('removes renamed or deleted folder tabs from both stores without matching sibling prefixes', () => {
+    const root = 'C:/Repo';
+    const ui = useUIStore.getState();
+    const files = useFilesViewTabsStore.getState();
+    for (const file of ['C:/Repo/src/a.ts', 'C:/Repo/src/b.ts', 'C:/Repo/src-other/c.ts']) {
+      ui.openContextFile(root, file);
+      files.addOpenPath(root, file);
+    }
+    ui.openContextFile('C:/Other', 'C:/Other/src/a.ts');
+    ui.removeContextFilesByPrefix(root, 'c:\\repo\\SRC');
+    expect(getContextPanelTabs(root).filter(tab => tab.mode === 'file').map(tab => tab.targetPath)).toEqual(['C:/Repo/src-other/c.ts']);
+    expect(useFilesViewTabsStore.getState().byRoot[root].openPaths).toEqual(['C:/Repo/src-other/c.ts']);
+    expect(getContextPanelTabs('C:/Other').some(tab => tab.targetPath === 'C:/Other/src/a.ts')).toBe(true);
+  });
   test('opening Changes from a PR walkthrough retains PR scope through normalization', () => {
     useUIStore.getState().openContextPanelTab('/repo', { mode: 'diff', diffScope: 'working' });
     useUIStore.getState().openContextPanelTab('/repo', { mode: 'walkthrough' });

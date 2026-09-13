@@ -857,10 +857,28 @@ const IframeBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tabI
   const startUrl = normalized !== BLANK_URL ? normalized : '';
 
   const [address, setAddress] = React.useState(startUrl);
-  const [loadedUrl, setLoadedUrl] = React.useState(startUrl);
+  const [loadedUrl, setLoadedUrl] = React.useState('');
+  const [tunnelFailedUrl, setTunnelFailedUrl] = React.useState<string | null>(null);
   const [history, setHistory] = React.useState<string[]>(startUrl ? [startUrl] : []);
   const [historyIndex, setHistoryIndex] = React.useState(startUrl ? 0 : -1);
   const [reloadNonce, bumpReload] = React.useReducer((value: number) => value + 1, 0);
+  const loadGenerationRef = React.useRef(0);
+
+  const resolveAndLoad = React.useCallback((url: string) => {
+    const generation = ++loadGenerationRef.current;
+    setTunnelFailedUrl(null);
+    void resolveBrowsableUrl(url).then((resolved) => {
+      if (loadGenerationRef.current === generation) setLoadedUrl(resolved);
+    }).catch(() => {
+      if (loadGenerationRef.current !== generation) return;
+      setLoadedUrl('');
+      setTunnelFailedUrl(url);
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (startUrl) resolveAndLoad(startUrl);
+  }, [resolveAndLoad, startUrl]);
 
   const persistUrl = React.useCallback((url: string) => {
     if (!url || url === BLANK_URL || !directory || !tabID) return;
@@ -879,7 +897,7 @@ const IframeBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tabI
     const next = normalizeBrowserUrl(value);
     if (next === BLANK_URL) return;
     setAddress(next);
-    setLoadedUrl(next);
+    resolveAndLoad(next);
     persistUrl(next);
     // The page is opaque here, so there is no load event and no title to wait
     // for; what was asked for is the only thing this runtime can record.
@@ -893,16 +911,16 @@ const IframeBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tabI
       setHistoryIndex(kept.length);
       return [...kept, next];
     });
-  }, [directory, historyIndex, persistUrl, recordHistoryVisit]);
+  }, [directory, historyIndex, persistUrl, recordHistoryVisit, resolveAndLoad]);
 
   const goTo = React.useCallback((index: number) => {
     const next = history[index];
     if (!next) return;
     setHistoryIndex(index);
     setAddress(next);
-    setLoadedUrl(next);
+    resolveAndLoad(next);
     persistUrl(next);
-  }, [history, persistUrl]);
+  }, [history, persistUrl, resolveAndLoad]);
 
   return (
     <div className="absolute inset-0 flex flex-col bg-background">
@@ -921,7 +939,11 @@ const IframeBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tabI
         isLoading={false}
       />
       <div className="relative min-h-0 flex-1 bg-background">
-        {loadedUrl ? (
+        {tunnelFailedUrl ? (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            {t('contextPanel.preview.proxyError')}
+          </div>
+        ) : loadedUrl ? (
           <iframe
             key={`${loadedUrl}|${reloadNonce}`}
             src={loadedUrl}

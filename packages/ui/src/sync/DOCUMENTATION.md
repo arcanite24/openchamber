@@ -2,6 +2,11 @@
 
 ## Scope
 
+OMP config responses declare `X-OMP-MCP-Scope: session`. Directory bootstrap
+then leaves MCP state untouched; `WorkStatusMcpSection` retrieves authoritative
+status from `/session/:id/mcp`. Missing or unrecognized scope headers retain
+OpenCode's directory status request. A failed config read does not disable it.
+
 This document covers the current client-side session/data architecture in `packages/ui/src/sync` and the rules for updating stores safely.
 
 There are **two distinct session data scopes** in the UI:
@@ -237,7 +242,7 @@ Rules:
    Directory `sessionStatusReady` records successful status-snapshot authority independently of bootstrap's general readiness. Before that flag or an explicit session status arrives, telemetry treats an omitted status as unknown. A failed status request cannot grant idle authority; the flag is not persisted.
 7. Pagination demand must carry the selected session's effective directory. It must not fall back to the sync provider directory because the visible session may belong to another worktree.
 8. The ref-stable loader is disposed only after the current task when its provider unmounts. This lets React Strict Mode's development setup → cleanup → setup probe retain a usable loader for child effects, while real disposal still invalidates the preceding lifecycle's work.
-9. Transcript arrays are chronological by `message.time.created`, with message ID used only as a deterministic equal-time tie-breaker. Message IDs are identity and reconciliation keys, not chronology: OpenCode's fixed-width sortable timestamp prefix rolls over, so a newer `msg_000...` can follow an older `msg_fff...`. Fetch, pagination, materialization, optimistic insertion, events, reconnect inspection, rendering, and revert/undo/redo must preserve this contract.
+9. Transcript arrays are chronological by `message.time.created`. Equal-time records group by the assistant's authoritative `parentID` (otherwise their own ID), put the parent first, then use message ID for deterministic ordering within the group. This prevents a same-millisecond reply from sorting before its user message. Message IDs are identity and reconciliation keys, not chronology: OpenCode's fixed-width sortable timestamp prefix rolls over, so a newer `msg_000...` can follow an older `msg_fff...`. Fetch, pagination, materialization, optimistic insertion, events, reconnect inspection, rendering, and revert/undo/redo must preserve this contract.
 10. Session-scoped ArrowUp and ArrowDown recall merges the visible transcript's user prompts (`useUserMessageHistory`) with the persisted input-history bucket for runtime + normalized directory + session identity. Revert markers hide prompts from the transcript source only; the persisted bucket still recalls them. Global scope reads the persisted runtime bucket alone.
 11. Part arrays preserve authoritative response/event order. Part IDs are identity keys and have the same rollover limitation; identity lookup/removal must not require a part array to be lexically ID-sorted.
 

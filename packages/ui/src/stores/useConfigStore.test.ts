@@ -262,7 +262,7 @@ Object.defineProperty(globalThis, 'window', {
 });
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: makeStorage() });
 
-const { useConfigStore } = await import('./useConfigStore');
+const { selectAgentsForDirectory, useConfigStore } = await import('./useConfigStore');
 const { emitSyncConfigChanged, setSyncRefs } = await import('@/sync/sync-refs');
 const { useSelectionStore } = await import('@/sync/selection-store');
 const { useSessionUIStore } = await import('@/sync/session-ui-store');
@@ -325,6 +325,16 @@ describe('useConfigStore provider persistence', () => {
     // The defaults loader has a short-lived module cache. Reset it between
     // tests through the same setter the settings page uses for a user edit.
     useConfigStore.getState().setSettingsDefaultModel(undefined);
+  });
+
+  test('selects the requested project agent roster without leaking the active project', async () => {
+    liveAgents = [{ name: 'build' }];
+    await useConfigStore.getState().loadAgents({ directory: DIRECTORY });
+    const state = useConfigStore.getState();
+    expect(selectAgentsForDirectory(state, DIRECTORY)).toBe(state.agents);
+    expect(selectAgentsForDirectory(state, OTHER_DIRECTORY)).toEqual([]);
+    const inactiveState = { ...state, activeDirectoryKey: OTHER_DIRECTORY, agents: [] };
+    expect(selectAgentsForDirectory(inactiveState, DIRECTORY)).toBe(state.directoryScoped[DIRECTORY].agents);
   });
 
   test('hydrates persisted provider snapshots for instant paint, then refreshes to live data', async () => {

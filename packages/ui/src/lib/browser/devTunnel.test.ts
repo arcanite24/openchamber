@@ -40,6 +40,7 @@ mock.module('@/lib/relay/runtime-tunnel', () => ({
 }));
 mock.module('@/lib/relay/runtime-socket', () => ({ openRuntimeWebSocket: (url: string) => { openedRelayUrl = url; return relaySocket; } }));
 mock.module('@/lib/runtime-auth', () => ({
+  buildRuntimeAuthHeaders: async (headers?: HeadersInit) => new Headers(headers),
   getRuntimeBearerTokenSync: () => 'token',
   getRuntimeExtraHeadersSync: () => ({}),
   refreshRuntimeUrlAuthToken: (baseUrl: string) => refreshUrlAuth(baseUrl),

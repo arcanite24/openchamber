@@ -1,12 +1,16 @@
+import { nativeMcpI18n } from './native-mcp.i18n';
 import type { I18nKey } from './en';
 import { settingsDict } from './ja.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
 import { credentialPoolI18n } from './credential-pool.i18n';
+import { nativeAgentI18n } from './native-agent.i18n';
 
 export const dict: Record<I18nKey, string> = {
   ...credentialPoolI18n["ja"],
+  ...nativeAgentI18n["ja"],
+  ...nativeMcpI18n["ja"],
   'sessions.aiRename.action': 'AIで名前を変更',
   'sessions.aiRename.generating': 'セッション名を生成中...',
   'sessions.aiRename.checking': '完了したやり取りを確認中...',

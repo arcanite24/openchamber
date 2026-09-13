@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { I18nKey } from '@/lib/i18n/store';
 import { buildSettingsSearchResults } from './search';
+import { useConfigStore } from '@/stores/useConfigStore';
 
 const t = (key: I18nKey): string => key;
 
@@ -17,6 +18,17 @@ const runtimeCtx = {
 };
 
 describe('settings search', () => {
+  test('shows MCP controls only for the current agent runtime', () => {
+    const previous = useConfigStore.getState().agents;
+    const find = () => buildSettingsSearchResults({ query: 'mcp', runtimeCtx, t, getPageTitle: page => page }).filter(item => item.page === 'mcp');
+    try {
+      useConfigStore.setState({ agents: [{ name: 'build', mode: 'primary', permission: [], options: { runtime: 'omp' } }] });
+      expect(find().map(item => item.id)).toEqual(['mcp.native']);
+      useConfigStore.setState({ agents: [] });
+      expect(find().some(item => item.id === 'mcp.native')).toBe(false);
+      expect(find().length).toBeGreaterThan(0);
+    } finally { useConfigStore.setState({ agents: previous }); }
+  });
   test('finds the scrollbar preference on every surface', () => {
     for (const context of [runtimeCtx, { ...runtimeCtx, isDesktop: true }, { ...runtimeCtx, isVSCode: true }, { ...runtimeCtx, isMobile: true }]) {
       const results = buildSettingsSearchResults({

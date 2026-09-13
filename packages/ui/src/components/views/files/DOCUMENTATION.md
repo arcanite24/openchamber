@@ -1,5 +1,11 @@
 # File tree loading and visibility
 
+After a successful rename or delete, both file-tree callers use
+`removeContextFilesByPrefix` to close stale file tabs in the context panel and
+editor store together. Folder descendants are included; similarly named siblings
+and other project roots remain open. A renamed file can be reopened at its new
+path. Failed operations do not remove tabs.
+
 `FilesView` and `SidebarFilesTree` keep directory snapshots in component state.
 `DirectoryRequests` owns shared in-flight reads and supersession. Repeated
 same-path callers await the same request; an explicit mutation refresh can

@@ -479,7 +479,10 @@ describe.runIf(canRunGit())('untracked diffs', () => {
     fs.writeFileSync(path.join(tmpDir, 'large.txt'), 'x'.repeat(21 * 1024 * 1024) + '\n');
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      await expect(getDiff(tmpDir, { path: 'large.txt' })).rejects.toThrow('maxBuffer');
+      const failure = await getDiff(tmpDir, { path: 'large.txt' }).catch((error) => error);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure.message).toContain('maxBuffer');
+      expect(failure.message.length).toBeLessThan(1024);
       expect(await getUntrackedDiffs(tmpDir, ['large.txt'])).toEqual(['']);
     } finally {
       errorSpy.mockRestore();
@@ -488,8 +491,8 @@ describe.runIf(canRunGit())('untracked diffs', () => {
 });
 
 describe('symlink diffs', () => {
-  it('treats an untracked directory symlink as a link in patch and split diffs', async () => {
-    if (!canRunGit() || process.platform === 'win32') return;
+  it.skipIf(process.platform === 'win32')('treats an untracked directory symlink as a link in patch and split diffs', async () => {
+    if (!canRunGit()) return;
     const { tmpDir } = await createTempRepo();
     fs.mkdirSync(path.join(tmpDir, 'source'));
     fs.symlinkSync('source', path.join(tmpDir, 'linked-source'));
@@ -618,7 +621,7 @@ describe('worktree root resolution', () => {
     runGit(repo, ['init', '-b', 'main']);
     fs.mkdirSync(subdirectory, { recursive: true });
 
-    await expect(resolveWorktreeTopLevel(subdirectory)).resolves.toEqual({ root: fs.realpathSync(repo) });
+    expect(fs.realpathSync((await resolveWorktreeTopLevel(subdirectory)).root)).toBe(fs.realpathSync(repo));
   });
 
   it('resolves the primary worktree root from a linked worktree', async () => {
@@ -635,7 +638,7 @@ describe('worktree root resolution', () => {
     fs.rmSync(worktree, { recursive: true, force: true });
     runGit(repo, ['worktree', 'add', '-b', 'feature/test', worktree, 'HEAD']);
 
-    await expect(resolvePrimaryWorktreeRoot(worktree)).resolves.toEqual({ root: fs.realpathSync(repo) });
+    expect(fs.realpathSync((await resolvePrimaryWorktreeRoot(worktree)).root)).toBe(fs.realpathSync(repo));
   });
 });
 
@@ -880,7 +883,7 @@ describe('createWorktree', () => {
       const hookLog = path.join(dataHome, 'post-checkout.log');
       installPostCheckoutHook(
         repo,
-        `#!/bin/sh\nprintf '%s|%s|%s|%s' "$1" "$2" "$3" "$(pwd -P)" > ${JSON.stringify(hookLog)}\n`,
+        `#!/bin/sh\nprintf '%s|%s|%s|%s' "$1" "$2" "$3" "$(pwd ${process.platform === 'win32' ? '-W' : '-P'})" > ${JSON.stringify(hookLog)}\n`,
       );
 
       const created = await createWorktree(repo, {
@@ -902,7 +905,7 @@ describe('createWorktree', () => {
       expect(previousHead).toBe('0000000000000000000000000000000000000000');
       expect(newHead).toBe(head);
       expect(flag).toBe('1');
-      expect(cwd).toBe(fs.realpathSync(created.path));
+      expect(fs.realpathSync(cwd)).toBe(fs.realpathSync(created.path));
     } finally {
       if (previousXdgDataHome === undefined) {
         delete process.env.XDG_DATA_HOME;
@@ -912,7 +915,8 @@ describe('createWorktree', () => {
     }
   });
 
-  it('skips a non-executable post-checkout hook', async () => {
+  // Windows Git does not use Unix executable permission bits to disable hooks.
+  it.skipIf(process.platform === 'win32')('skips a non-executable post-checkout hook', async () => {
     if (!canRunGit()) return;
 
     const previousXdgDataHome = process.env.XDG_DATA_HOME;
@@ -1075,7 +1079,7 @@ describe('createWorktree', () => {
 
     await expect(populateWorktreeWithLockRecovery(worktree)).resolves.toBeUndefined();
     expect(fs.existsSync(lockPath)).toBe(false);
-    expect(fs.readFileSync(path.join(worktree, 'README.md'), 'utf8')).toBe('# Test\n');
+    expect(fs.readFileSync(path.join(worktree, 'README.md'), 'utf8').replace(/\r\n/g, '\n')).toBe('# Test\n');
   });
 
   it('preflights fast create branch-in-use failures before creating the candidate directory', async () => {
@@ -1098,7 +1102,7 @@ describe('createWorktree', () => {
 
       fs.rmSync(worktree, { recursive: true, force: true });
       runGit(repo, ['worktree', 'add', '-b', 'feature/in-use', worktree, 'HEAD']);
-      const canonicalWorktree = fs.realpathSync(worktree);
+      const canonicalWorktree = fs.realpathSync(worktree).replace(/\\/g, '/');
 
       await expect(createWorktree(repo, {
         mode: 'existing',
@@ -1554,7 +1558,7 @@ describe('cherryPick', () => {
     expect(result).toEqual({ success: true, conflict: false });
 
     const content = await fs.promises.readFile(filePath, 'utf8');
-    expect(content).toBe('line1\nline2\nline3\n');
+    expect(content.replace(/\r\n/g, '\n')).toBe('line1\nline2\nline3\n');
   });
 
   it('returns conflict info when cherry-picking a conflicting commit', async () => {
@@ -1609,7 +1613,7 @@ describe('revertCommit', () => {
     const status = await git.status();
     expect(status.staged.length).toBeGreaterThan(0);
     const content = await fs.promises.readFile(filePath, 'utf8');
-    expect(content).toBe('line1\nline2\n');
+    expect(content.replace(/\r\n/g, '\n')).toBe('line1\nline2\n');
   });
 
   it('returns conflict info when reverting causes a conflict', async () => {
@@ -1709,7 +1713,7 @@ describe('resetToCommit', () => {
     const log = await git.log();
     expect(log.latest.hash).toBe(firstCommit.commit);
     const content = await fs.promises.readFile(filePath, 'utf8');
-    expect(content).toBe('first\n');
+    expect(content.replace(/\r\n/g, '\n')).toBe('first\n');
 
     const status = await git.status();
     expect(status.isClean()).toBe(true);
@@ -1752,7 +1756,7 @@ describe('resetToCommit', () => {
     const log = await git.log();
     expect(log.latest.hash).toBe(firstCommit.commit);
     const content = await fs.promises.readFile(filePath, 'utf8');
-    expect(content).toBe('first\n');
+    expect(content.replace(/\r\n/g, '\n')).toBe('first\n');
   });
 });
 
@@ -1956,7 +1960,7 @@ describe.runIf(canRunGit())('commit comparisons', () => {
 
   it('keeps rename paths and original contents together, including whitespace in names', async () => {
     const { repository } = createRepositoryWithRemote();
-    const destination = ' new\nname.md';
+    const destination = process.platform === 'win32' ? ' new name.md' : ' new\nname.md';
     runGit(repository, ['mv', 'README.md', destination]);
     runGit(repository, ['commit', '-m', 'rename']);
     const hash = runGit(repository, ['rev-parse', 'HEAD']).trim();
@@ -2127,11 +2131,19 @@ describe.runIf(canRunGit())('getRangeDiff', () => {
     await expect(getRangeDiff(repository, { ...options, base: 'origin/react' })).rejects.toThrow(/checked-out branch/);
   });
 
-  it('includes untracked symlinks as links without reading their targets', async () => {
+  it('includes untracked symlinks as links without reading their targets', async (context) => {
     const { repository } = createRepositoryWithRemote();
     const outside = path.join(createTempDir(), 'outside.txt');
     fs.writeFileSync(outside, 'must not be in a diff\n');
-    fs.symlinkSync(outside, path.join(repository, 'link.txt'));
+    try {
+      fs.symlinkSync(outside, path.join(repository, 'link.txt'));
+    } catch (error) {
+      if (process.platform === 'win32' && error.code === 'EPERM') {
+        context.skip('Windows symlink creation privilege is unavailable');
+        return;
+      }
+      throw error;
+    }
     const diff = await getRangeDiff(repository, { base: 'origin/react', head: 'next', includeWorkingTree: true });
     expect(diff).toContain('new file mode 120000');
     expect(diff).toContain(outside);

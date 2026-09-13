@@ -172,7 +172,7 @@ describe('issue #2746 - worktree long path support', () => {
       }, { timeout: 10_000 }).toBe('failed');
 
       const status = await getWorktreeBootstrapStatus(created.path);
-      expect(status?.error).toMatch(/file name too long|filename too long/i);
+      expect(status?.error).toMatch(/file name too long|filename too long|Invalid argument/i);
       expect(status?.error).toMatch(/path-length limit/i);
       expect(runGit(created.path, ['config', '--get', 'core.longpaths']).trim()).toBe('true');
     } finally {
@@ -201,6 +201,6 @@ describe('issue #2746 - worktree long path support', () => {
 
     await expect(populateWorktreeWithLockRecovery(worktree)).resolves.toBeUndefined();
     expect(runGit(worktree, ['config', '--get', 'core.longpaths']).trim()).toBe('true');
-    expect(fs.readFileSync(path.join(worktree, 'README.md'), 'utf8')).toBe('# Test\n');
+    expect(fs.readFileSync(path.join(worktree, 'README.md'), 'utf8').replace(/\r\n/g, '\n')).toBe('# Test\n');
   });
 });

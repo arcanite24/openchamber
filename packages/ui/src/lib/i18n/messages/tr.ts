@@ -1,11 +1,15 @@
+import { nativeMcpI18n } from './native-mcp.i18n';
 import { settingsDict } from './tr.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
 import { credentialPoolI18n } from './credential-pool.i18n';
+import { nativeAgentI18n } from './native-agent.i18n';
 
 export const dict = {
+  ...nativeMcpI18n["tr"],
   ...credentialPoolI18n["tr"],
+  ...nativeAgentI18n["tr"],
   'sessions.aiRename.action': 'Yapay zekâ ile yeniden adlandır',
   'sessions.aiRename.generating': 'Oturum başlığı oluşturuluyor...',
   'sessions.aiRename.checking': 'Tamamlanan konuşma turları kontrol ediliyor...',

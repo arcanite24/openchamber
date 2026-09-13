@@ -1463,10 +1463,10 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
         .then(async (result) => {
           if (result.success) {
             toast.success(t('sidebarFilesTree.toast.renamedSuccessfully'));
-            await refreshDirectory(parentDir);
             if (root) {
-              removeOpenPathsByPrefix(root, oldPath);
+              useUIStore.getState().removeContextFilesByPrefix(root, oldPath);
             }
+            await refreshDirectory(parentDir);
             if (selectedFile?.path === oldPath || selectedFile?.path.startsWith(`${oldPath}/`)) {
               if (root) {
                 setSelectedPath(root, null);
@@ -1500,10 +1500,10 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
         .then(async (result) => {
           if (result.success) {
             toast.success(t('sidebarFilesTree.toast.deletedSuccessfully'));
-            await refreshDirectory(parentDir);
             if (root) {
-              removeOpenPathsByPrefix(root, deletedPath);
+              useUIStore.getState().removeContextFilesByPrefix(root, deletedPath);
             }
+            await refreshDirectory(parentDir);
             if (selectedFile?.path === deletedPath || selectedFile?.path.startsWith(`${deletedPath}/`)) {
               if (root) {
                 setSelectedPath(root, null);
@@ -1525,7 +1525,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
     }
 
     done();
-  }, [activeDialog, dialogData, dialogInputValue, files, refreshDirectory, isMobile, removeOpenPathsByPrefix, root, selectedFile?.path, setSelectedPath, t]);
+  }, [activeDialog, dialogData, dialogInputValue, files, refreshDirectory, isMobile, root, selectedFile?.path, setSelectedPath, t]);
 
   React.useEffect(() => {
     if (!currentDirectory) {

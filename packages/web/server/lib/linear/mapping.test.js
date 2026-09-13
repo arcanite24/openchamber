@@ -53,6 +53,10 @@ describe('Linear project mapping storage', () => {
       teamProjectPaths: { 'team-eng': '/Users/ada/eng' },
     });
     expect(readStoredLinearMapping()).toEqual(written);
+  });
+
+  it.skipIf(process.platform === 'win32')('uses owner-only POSIX permissions', () => {
+    setStoredLinearMapping({ defaultProjectPath: '/project', teamProjectPaths: {} });
     expect(fs.statSync(getLinearMappingFilePath()).mode & 0o777).toBe(0o600);
   });
 

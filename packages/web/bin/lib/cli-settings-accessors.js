@@ -81,17 +81,7 @@ export const createSettingsAccessors = ({ fsPromises, path, dataDir, settingsFil
       }
     }
 
-    if (!isTransientWindowsReplaceError(lastError)) {
-      throw lastError;
-    }
-
-    // Windows can transiently reject the atomic replace while another process
-    // briefly holds the target open. Fall back to copying the COMPLETE tmp file
-    // so persistence never wedges. Note: copyFile is NOT atomic — this is a
-    // last-resort path confined to Windows, matching the settings runtime's
-    // fallback, not a substitute for the atomic rename used everywhere else.
-    await fsPromises.copyFile(tmp, target);
-    await fsPromises.rm(tmp, { force: true });
+    throw lastError;
   };
 
   const writeSettingsToDisk = async (settings) => {
@@ -101,7 +91,11 @@ export const createSettingsAccessors = ({ fsPromises, path, dataDir, settingsFil
     if (process.platform !== 'win32') {
       await fsPromises.chmod(tmp, 0o600);
     }
-    await replaceFile(tmp, settingsPath);
+    try {
+      await replaceFile(tmp, settingsPath);
+    } finally {
+      await fsPromises.rm(tmp, { force: true }).catch(() => {});
+    }
     if (process.platform !== 'win32') {
       await fsPromises.chmod(settingsPath, 0o600);
     }

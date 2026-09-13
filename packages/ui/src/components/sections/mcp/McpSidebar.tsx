@@ -26,6 +26,7 @@ import {
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useI18n } from '@/lib/i18n';
 import { SETTINGS_PANEL_TITLE_CLASS } from '@/components/sections/shared/SettingsSection';
+import { useConfigStore } from '@/stores/useConfigStore';
 
 interface McpSidebarProps {
   onItemSelect?: () => void;
@@ -62,6 +63,13 @@ const StatusDot: React.FC<{ tone: StatusTone; enabled: boolean }> = ({ tone, ena
 };
 
 export const McpSidebar: React.FC<McpSidebarProps> = ({ onItemSelect }) => {
+  const native = useConfigStore(state => state.agents.some(agent => agent.options?.runtime === 'omp'));
+  const { t } = useI18n();
+  if (native) return <div className="p-4 space-y-3"><SettingsProjectSelector /><Button variant="ghost" onClick={onItemSelect}>{t('settings.mcp.native.title')}</Button></div>;
+  return <OpenCodeMcpSidebar onItemSelect={onItemSelect} />;
+};
+
+const OpenCodeMcpSidebar: React.FC<McpSidebarProps> = ({ onItemSelect }) => {
   const { t } = useI18n();
   const bgClass = 'bg-background';
 

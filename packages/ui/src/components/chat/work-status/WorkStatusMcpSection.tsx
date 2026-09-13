@@ -1,8 +1,12 @@
 import React from 'react';
+import { z } from 'zod';
+import { runtimeFetch } from '@/lib/runtime-fetch';
+import { useSyncRuntime } from '@/sync/sync-context';
 import { useI18n } from '@/lib/i18n';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { useMcpStore } from '@/stores/useMcpStore';
-import { useConfigStore } from '@/stores/useConfigStore';
+import { selectAgentsForDirectory, useConfigStore } from '@/stores/useConfigStore';
 import { McpIcon } from '@/components/icons/McpIcon';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
 import { toast } from 'sonner';
@@ -12,6 +16,7 @@ import { useReportWorkStatusPresence } from './presenceContext';
 
 type Props = {
   directory: string | null;
+  sessionId: string | null;
 };
 
 const MCP_STATUS_MAX_AGE_MS = 60_000;
@@ -20,7 +25,72 @@ const MCP_STATUS_MAX_AGE_MS = 60_000;
  * MCP servers with their connection switches, reusing the dropdown's own
  * connect/disconnect actions.
  */
-export const WorkStatusMcpSection: React.FC<Props> = ({ directory }) => {
+export const WorkStatusMcpSection: React.FC<Props> = ({ directory, sessionId }) => {
+  const native = useConfigStore(state => selectAgentsForDirectory(state, directory).some(agent => agent.options?.runtime === 'omp'));
+  const { runtimeKey } = useSyncRuntime();
+  if (native) return sessionId ? <NativeMcpSection key={JSON.stringify([runtimeKey, directory, sessionId])} sessionId={sessionId} directory={directory} /> : null;
+  return <OpenCodeMcpSection directory={directory} />;
+};
+
+const nativeMcpSchema = z.object({
+  failedConnections: z.number().int().nonnegative().optional(),
+  managerAvailable: z.boolean(), registeredTools: z.array(z.string()),
+  servers: z.array(z.object({ name: z.string(), status: z.enum(['connected', 'connecting', 'disconnected']) })),
+});
+
+function NativeMcpSection({ sessionId, directory }: { sessionId: string; directory: string | null }) {
+  const { t } = useI18n();
+  const [snapshot, setSnapshot] = React.useState<z.infer<typeof nativeMcpSchema> | null>(null);
+  const [failed, setFailed] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const mutation = React.useRef(false);
+  const revision = React.useRef(0);
+  const lifetime = React.useRef<AbortController | null>(null);
+  const query = new URLSearchParams();
+  if (directory) query.set('directory', directory);
+  const url = `/api/session/${encodeURIComponent(sessionId)}/mcp?${query}`;
+  React.useEffect(() => {
+    const controller = new AbortController();
+    lifetime.current = controller;
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      const current = revision.current;
+      try {
+        if (!mutation.current) {
+          const response = await runtimeFetch(url, { signal: controller.signal });
+          if (!response.ok) throw new Error('MCP status unavailable');
+          const next = nativeMcpSchema.parse(await response.json());
+          if (!controller.signal.aborted && current === revision.current) { setSnapshot(next); setFailed(false); }
+        }
+      } catch { if (!controller.signal.aborted && current === revision.current) setFailed(true); }
+      finally { if (!controller.signal.aborted) timer = setTimeout(() => void refresh(), 15_000); }
+    };
+    void refresh();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [url]);
+  const update = async (action: { name: string; connected: boolean } | { reload: true }) => {
+    const controller = lifetime.current;
+    if (!controller || controller.signal.aborted || mutation.current) return;
+    mutation.current = true; revision.current++; setBusy(true);
+    try {
+      const response = await runtimeFetch(url, { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) });
+      if (!response.ok) throw new Error('MCP connection change failed');
+      const next = nativeMcpSchema.parse(await response.json());
+      if (!controller.signal.aborted) { setSnapshot(next); setFailed((next.failedConnections ?? 0) > 0); }
+    } catch { if (!controller.signal.aborted) setFailed(true); }
+    finally { mutation.current = false; if (!controller.signal.aborted) setBusy(false); }
+  };
+  const servers = snapshot?.servers ?? [];
+  useReportWorkStatusPresence('mcp', true);
+  return <WorkStatusCollapsibleSection id="mcp" title={t('chat.workStatus.section.mcp')} iconNode={<McpIcon className="size-4 shrink-0" />} summary={`${servers.filter(server => server.status === 'connected').length}/${servers.length}`}>
+    {failed && <p role="alert" className="typography-meta text-destructive">{t('chat.workStatus.mcp.failed')}</p>}
+    {!snapshot && !failed && <p className="typography-meta text-muted-foreground">{t('common.loading')}</p>}
+    {servers.map(server => <WorkStatusRow key={server.name} label={server.name} muted={server.status !== 'connected'} leading={<Switch checked={server.status === 'connected'} disabled={busy || server.status === 'connecting'} loading={busy || server.status === 'connecting'} aria-label={t('chat.workStatus.mcp.toggle', { name: server.name })} onCheckedChange={connected => { void update({ name: server.name, connected }); }} />} />)}
+    <Button variant="ghost" size="sm" disabled={busy || !snapshot?.managerAvailable} onClick={() => void update({ reload: true })}>{t('settings.mcp.native.reload')}</Button>
+  </WorkStatusCollapsibleSection>;
+}
+
+const OpenCodeMcpSection: React.FC<{ directory: string | null }> = ({ directory }) => {
   const { t } = useI18n();
 
   const mcpStatus = useMcpStore(

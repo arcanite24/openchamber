@@ -229,14 +229,14 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
   React.useEffect(() => {
     if (!onCancel) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !e.defaultPrevented && !e.isComposing) {
         e.preventDefault();
         e.stopPropagation();
         onCancel();
       }
     };
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
   const [worktreeBaseBranch, setWorktreeBaseBranch] = React.useState<string>('');

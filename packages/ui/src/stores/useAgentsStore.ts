@@ -94,6 +94,7 @@ const buildAgentsSignature = (agents: Agent[]): string => {
       const extended = agent as AgentWithExtras;
       return [
         agent.name,
+        JSON.stringify(agent.options),
         extended.mode ?? '',
         typeof extended.model === 'object' && extended.model
           ? `${extended.model.providerID ?? ''}/${extended.model.modelID ?? ''}`
@@ -256,6 +257,7 @@ const upsertOptimisticAgentLocal = (
 export interface AgentDraft {
   name: string;
   scope: AgentScope;
+  nativeContent?: string;
   description?: string;
   model?: string | null;
   variant?: string;
@@ -279,7 +281,7 @@ interface AgentsStore {
 
   setSelectedAgent: (name: string | null) => void;
   setAgentDraft: (draft: AgentDraft | null) => void;
-  loadAgents: (directory?: string | null) => Promise<boolean>;
+  loadAgents: (directory?: string | null, force?: boolean) => Promise<boolean>;
   createAgent: (config: AgentConfig, directory?: string | null) => Promise<AgentMutationResult>;
   updateAgent: (name: string, config: Partial<AgentConfig>, directory?: string | null) => Promise<AgentMutationResult>;
   deleteAgent: (name: string, scope?: AgentScope, directory?: string | null) => Promise<AgentMutationResult>;
@@ -327,7 +329,7 @@ export const useAgentsStore = create<AgentsStore>()(
           set({ agentDraft: draft });
         },
 
-        loadAgents: async (requestedDirectory?: string | null) => {
+        loadAgents: async (requestedDirectory?: string | null, force = false) => {
           const configDirectory = resolveDirectory(requestedDirectory);
           const cacheKey = getAgentsCacheKey(configDirectory);
           const isAmbient = cacheKey === getAgentsCacheKey(getConfigDirectory());
@@ -335,12 +337,13 @@ export const useAgentsStore = create<AgentsStore>()(
           const loadedAt = agentsLastLoadedAt.get(cacheKey) ?? 0;
           const hasCachedAgents = (get().agentsByDirectory[cacheKey] ?? (isAmbient ? get().agents : [])).length > 0;
 
-          if (hasCachedAgents && now - loadedAt < AGENTS_LOAD_CACHE_TTL_MS) {
+          if (!force && hasCachedAgents && now - loadedAt < AGENTS_LOAD_CACHE_TTL_MS) {
             return true;
           }
 
           const inFlight = agentsLoadInFlight.get(cacheKey);
           if (inFlight) {
+            if (force) { await inFlight; return get().loadAgents(requestedDirectory, true); }
             return inFlight;
           }
 
@@ -362,6 +365,10 @@ export const useAgentsStore = create<AgentsStore>()(
 
                 const agentsWithScope = await Promise.all(
                   agents.map(async (agent) => {
+                    if (agent.options?.runtime === 'omp') {
+                      const scope: AgentScope | undefined = agent.options.scope === 'project' ? 'project' : agent.options.scope === 'user' ? 'user' : undefined;
+                      return { ...agent, scope };
+                    }
                     try {
                       // Force no-cache to ensure we get the latest scope info
                       const response = await runtimeFetch(`/api/config/agents/${encodeURIComponent(agent.name)}${queryParams}`, {
@@ -405,13 +412,13 @@ export const useAgentsStore = create<AgentsStore>()(
                 );
 
                 const nextSignature = buildAgentsSignature(agentsWithScope);
-                if (previousSignature !== nextSignature) {
+                if (previousSignature !== nextSignature || !get().agentsByDirectory[cacheKey]) {
                   set((state) => {
                     const next: Partial<AgentsStore> = {
                       agentsByDirectory: { ...state.agentsByDirectory, [cacheKey]: agentsWithScope },
                       isLoading: false,
                     };
-                    if (isAmbient) next.agents = agentsWithScope;
+                    if (cacheKey === getAgentsCacheKey(getConfigDirectory())) next.agents = agentsWithScope;
                     return next;
                   });
                 } else {
@@ -585,6 +592,21 @@ export const useAgentsStore = create<AgentsStore>()(
         deleteAgent: async (name: string, scope?: AgentScope, requestedDirectory?: string | null) => {
           try {
             const configDirectory = resolveDirectory(requestedDirectory);
+            const agent = get().getAgentByName(name, configDirectory);
+            if (agent?.options?.runtime === 'omp') {
+              const nativeScope = scope ?? agent.options.scope;
+              if (nativeScope !== 'user' && nativeScope !== 'project') {
+                throw new Error('Only saved agent definitions can be deleted');
+              }
+              const query = new URLSearchParams({ name, scope: nativeScope });
+              if (configDirectory) query.set('directory', configDirectory);
+              const response = await runtimeFetch(`/api/omp/agent-definition?${query}`, { method: 'DELETE' });
+              if (!response.ok) throw new Error('Failed to delete agent definition');
+              invalidateAgentsLoadCache(configDirectory);
+              const loaded = await get().loadAgents(configDirectory, true);
+              if (loaded && get().selectedAgentName === name) set({ selectedAgentName: null });
+              return { ok: loaded };
+            }
             const queryParams = configDirectory ? `?directory=${encodeURIComponent(configDirectory)}` : '';
 
             const response = await runtimeFetch(`/api/config/agents/${encodeURIComponent(name)}${queryParams}`, {

@@ -646,7 +646,6 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean }> = ({ visible }) =>
   const selectedPath = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.selectedPath ?? null) : null));
   const setSelectedPath = useFilesViewTabsStore((state) => state.setSelectedPath);
   const addOpenPath = useFilesViewTabsStore((state) => state.addOpenPath);
-  const removeOpenPathsByPrefix = useFilesViewTabsStore((state) => state.removeOpenPathsByPrefix);
   const toggleExpandedPath = useFilesViewTabsStore((state) => state.toggleExpandedPath);
   const collapseAllExpandedPaths = useFilesViewTabsStore((state) => state.collapseAllExpandedPaths);
   const contextTabs = useUIStore((state) => (root ? (state.contextPanelByDirectory[root]?.tabs ?? EMPTY_CONTEXT_TABS) : EMPTY_CONTEXT_TABS));
@@ -1201,10 +1200,10 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean }> = ({ visible }) =>
         .then(async (result) => {
           if (result.success) {
             toast.success(t('sidebarFilesTree.toast.renamedSuccessfully'));
-            await refreshDirectory(parentDir);
             if (root) {
-              removeOpenPathsByPrefix(root, oldPath);
+              useUIStore.getState().removeContextFilesByPrefix(root, oldPath);
             }
+            await refreshDirectory(parentDir);
             if (selectedPath === oldPath || (selectedPath && selectedPath.startsWith(`${oldPath}/`))) {
               setSelectedPath(root, null);
             }
@@ -1229,10 +1228,10 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean }> = ({ visible }) =>
         .then(async (result) => {
           if (result.success) {
             toast.success(t('sidebarFilesTree.toast.deletedSuccessfully'));
-            await refreshDirectory(parentDir);
             if (root) {
-              removeOpenPathsByPrefix(root, deletedPath);
+              useUIStore.getState().removeContextFilesByPrefix(root, deletedPath);
             }
+            await refreshDirectory(parentDir);
             if (selectedPath === deletedPath || (selectedPath && selectedPath.startsWith(deletedPath + '/'))) {
               setSelectedPath(root, null);
             }
@@ -1245,7 +1244,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean }> = ({ visible }) =>
     }
 
     done();
-  }, [activeDialog, dialogData, dialogInputValue, files, refreshDirectory, removeOpenPathsByPrefix, root, selectedPath, setSelectedPath, t]);
+  }, [activeDialog, dialogData, dialogInputValue, files, refreshDirectory, root, selectedPath, setSelectedPath, t]);
 
   // --- Tree rendering (matching FilesView with indent guides) ---
 

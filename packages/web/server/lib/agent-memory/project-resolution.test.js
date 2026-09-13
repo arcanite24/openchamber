@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import path from 'node:path';
 
 import { createMemoryProjectResolver } from './project-resolution.js';
 import { createProjectIdFromPath } from '../projects/project-id.js';
 
-const PROJECT = '/Users/x/projects/openchamber';
-const WORKTREE = '/Users/x/.local/share/opencode/worktree/abc/jammy-koala';
+const PROJECT = path.resolve('/Users/x/projects/openchamber');
+const WORKTREE = path.resolve('/Users/x/.local/share/opencode/worktree/abc/jammy-koala');
 
 const createResolver = (overrides = {}) => createMemoryProjectResolver({
   listProjectPaths: async () => [PROJECT],
@@ -48,11 +49,12 @@ describe('resolving a session directory to its project', () => {
   test('a directory outside any repository keys by itself', async () => {
     const resolve = createResolver();
 
-    expect(await resolve('/tmp/loose')).toBe(createProjectIdFromPath('/tmp/loose'));
+    const directory = path.resolve('/tmp/loose');
+    expect(await resolve(directory)).toBe(createProjectIdFromPath(directory));
   });
 
   test('managed chat session directories share the Chats root store', async () => {
-    const chatsRoot = '/Users/x/.config/openchamber/chats';
+    const chatsRoot = path.resolve('/Users/x/.config/openchamber/chats');
     const resolve = createResolver({ managedProjectRoots: [chatsRoot] });
 
     expect(await resolve(`${chatsRoot}/2026-08-21/session-a`)).toBe(createProjectIdFromPath(chatsRoot));

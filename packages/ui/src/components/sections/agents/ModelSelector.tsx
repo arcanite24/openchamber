@@ -177,8 +177,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
     return (
         <DropdownMenu open={isReady && isDropdownOpen} onOpenChange={isReady ? setIsDropdownOpen : undefined}>
-            <DropdownMenuTrigger asChild>
-                <div
+            <DropdownMenuTrigger
+                    disabled={!isReady}
+                    aria-label={compact ? triggerLabel : undefined}
                     className={cn(
                         dropdownTriggerVariants({ size: 'sm' }),
                         'min-w-0 w-fit',
@@ -207,7 +208,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                         </>
                     )}
                     {!compact && <Icon name="arrow-down-s" className="h-4 w-4 flex-shrink-0 text-muted-foreground/50" />}
-                </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-[min(380px,calc(100vw-2rem))] p-0 flex flex-col" align="start" portalToBody={dropdownPortalToBody}>
                 {picker}

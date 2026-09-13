@@ -1,12 +1,16 @@
+import { nativeMcpI18n } from './native-mcp.i18n';
 import type { I18nKey } from './en';
 import { settingsDict } from './zh-TW.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
 import { credentialPoolI18n } from './credential-pool.i18n';
+import { nativeAgentI18n } from './native-agent.i18n';
 
 export const dict: Record<I18nKey, string> = {
   ...credentialPoolI18n["zh-TW"],
+  ...nativeAgentI18n["zh-TW"],
+  ...nativeMcpI18n["zh-TW"],
   'sessions.aiRename.action': '使用 AI 重新命名',
   'sessions.aiRename.generating': '正在產生工作階段標題...',
   'sessions.aiRename.checking': '正在檢查已完成的對話回合...',

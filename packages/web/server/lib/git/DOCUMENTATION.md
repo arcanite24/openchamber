@@ -122,6 +122,12 @@ The following functions are internal helpers used by exported functions:
 
 ## Response Contracts
 
+- Git output-buffer failures report the process limit error without embedding partial stdout. Untracked diff failures prioritize that error over incidental stderr warnings; a truncated patch is never returned as a successful diff.
+
+- On Windows, a Git directory-creation `Invalid argument` error naming a component longer than 255 characters gets specific guidance to shorten that component. Enabling long paths does not remove the component limit; unrelated invalid-argument errors retain their original message.
+
+- Post-checkout hooks execute through `git hook run`, so Git handles shebangs on Windows as well as Unix. This requires Git 2.36 or newer. Windows does not use Unix executable permission bits to disable a hook.
+
 ### Status Response
 - `current`: Current branch name.
 - `tracking`: Upstream branch (e.g., 'origin/main').
@@ -179,6 +185,7 @@ The following functions are internal helpers used by exported functions:
 - `sourceFetchFailed`: Present when the automatic source-branch fetch failed and creation fell back to the tracked local branch.
 - Fast-create background failures remove OpenCode sandbox metadata for directories that never became Git worktrees, and remove the pre-created directory only if it is still empty. User-created files are never recursively deleted by this cleanup.
 - Worktree removal waits for any active create/bootstrap task for that directory before deleting it, preventing a background Git or setup task from restoring removed state or racing filesystem cleanup.
+- Windows setup/start commands run through `ComSpec /d /s /c` with verbatim arguments and an outer command quote. Quoted executable paths retain cmd syntax instead of receiving C-runtime backslash escaping. AutoRun commands are disabled for this invocation.
 - Worktree bootstrap retries transient `index.lock` conflicts. If the lock remains byte-for-byte and metadata-identical across the retry window, it is treated as stale, removed, and population continues automatically; changing locks are left untouched and reported as failures.
 - Worktree population enables Git `core.longpaths` (local repo config plus `-c core.longpaths=true` on `git reset --hard`) so deeply nested checkouts under the managed data-dir worktree root do not fail on Windows MAX_PATH with "Filename too long". Path-component limits that the filesystem itself rejects still fail bootstrap, with a clearer path-length guidance message.
 

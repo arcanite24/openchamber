@@ -15,6 +15,15 @@ const message = (id: string, created: number): Message => ({
 } as Message)
 
 describe("message chronology", () => {
+  test("keeps equal-time replies after their parent for fetch and live insertion", () => {
+    const parent = message("msg_z_user", 100)
+    const reply = { ...message("msg_a_assistant", 100), role: "assistant", parentID: parent.id } as Message
+    const other = message("msg_m_user", 100)
+    expect(sortMessagesChronologically([reply, parent, other])).toEqual([other, parent, reply])
+    const messages = [other, parent]
+    insertMessageChronologically(messages, reply)
+    expect(messages).toEqual([other, parent, reply])
+  })
   test("orders post-rollover IDs after legacy IDs by creation time", () => {
     const legacy = message("msg_ffffffffffffLegacy", 100)
     const current = message("msg_000000000000Current", 200)

@@ -1237,6 +1237,18 @@ export const selectProvidersForDirectory = (
 
 const EMPTY_PROVIDERS: ProviderWithModelList[] = [];
 
+export const selectAgentsForDirectory = (
+    state: Pick<ConfigStore, "agents" | "directoryScoped" | "activeDirectoryKey">,
+    directory?: string | null,
+): Agent[] => {
+    const directoryKey = toConfigDirectoryKey(directory);
+    return directoryKey === state.activeDirectoryKey
+        ? state.agents
+        : state.directoryScoped[directoryKey]?.agents ?? EMPTY_AGENTS;
+};
+
+const EMPTY_AGENTS: Agent[] = [];
+
 export const useConfigStore = create<ConfigStore>()(
     devtools(
         persist(

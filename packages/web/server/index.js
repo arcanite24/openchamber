@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import express from 'express';
+import { createOwnerGate } from './lib/ui-auth/owner-gate.js';
+import { createWebPreviewRuntime } from './lib/dev-tunnel/web-preview.js';
 import compression from 'compression';
 import path from 'path';
 import { spawn, spawnSync } from 'child_process';
@@ -1672,6 +1674,16 @@ async function main(options = {}) {
   const sayTTSCapability = detectSayTtsCapability(process);
 
   const app = express();
+  const ownerGate = createOwnerGate({
+    origin: process.env.OPENCHAMBER_OWNER_ORIGIN,
+    email: process.env.OPENCHAMBER_OWNER_EMAIL,
+    proxySecret: process.env.OPENCHAMBER_OWNER_PROXY_SECRET,
+  });
+  if (ownerGate) {
+    const [major, minor] = process.versions.node.split('.').map(Number);
+    if (major < 24 || (major === 24 && minor < 9)) throw new Error('Owner-gated hosting requires Node 24.9 or newer');
+    app.use(ownerGate.middleware);
+  }
   const serverStartedAt = new Date().toISOString();
   const packagedClientOrigins = new Set([
     'openchamber-ui://app',
@@ -1719,7 +1731,7 @@ async function main(options = {}) {
     threshold: 1024,
   }));
   expressApp = app;
-  server = http.createServer(app);
+  server = ownerGate ? http.createServer({ shouldUpgradeCallback: ownerGate.shouldUpgradeCallback }, app) : http.createServer(app);
   let realtimeProxyRuntime = { stop: () => {} };
 
   // The relay service is constructed further below (it depends on the tunnel
@@ -1910,8 +1922,30 @@ async function main(options = {}) {
   // One scanner backs both discovery and the tunnel allowlist, so a port the
   // user can see is exactly a port the tunnel will dial.
   const devServerScanner = createDevServerScanner({ spawn, platform: process.platform });
+  const previewDomain = process.env.OPENCHAMBER_PREVIEW_DOMAIN;
+  const previewPort = Number(process.env.OPENCHAMBER_PREVIEW_PORT);
+  if (previewDomain && (!ownerGate || !Number.isInteger(previewPort) || previewPort < 1 || previewPort > 65535 || previewPort === port || previewPort === openCodePort)) {
+    throw new Error('Web previews require owner authentication and a separate preview port');
+  }
   const listDevServers = () => devServerScanner.discover({
-    ownPorts: [port, openCodePort].filter((value) => Number.isInteger(value) && value > 0),
+    ownPorts: [port, openCodePort, previewPort].filter((value) => Number.isInteger(value) && value > 0),
+  });
+  const webPreview = previewDomain ? createWebPreviewRuntime({
+    domain: previewDomain,
+    ownerOrigin: process.env.OPENCHAMBER_OWNER_ORIGIN,
+    email: process.env.OPENCHAMBER_OWNER_EMAIL,
+    proxySecret: process.env.OPENCHAMBER_OWNER_PROXY_SECRET,
+    discoverDevServers: listDevServers,
+  }) : null;
+  app.get('/api/dev-servers/preview', async (req, res) => {
+    if (!webPreview) return res.status(501).json({ error: 'Web preview hosting is not configured' });
+    const values = new URL(req.originalUrl, 'http://localhost').searchParams.getAll('url');
+    if (values.length !== 1) return res.status(400).json({ error: 'One preview URL is required' });
+    try {
+      res.json({ url: await webPreview.resolveUrl(values[0]) });
+    } catch (error) {
+      res.status(503).json({ error: error.message });
+    }
   });
 
   createDevTunnelRuntime({
@@ -2028,6 +2062,20 @@ async function main(options = {}) {
   terminalRuntime = startupPipelineResult.terminalRuntime;
   dictationRuntime = startupPipelineResult.dictationRuntime;
   messageStreamRuntime = startupPipelineResult.messageStreamRuntime;
+
+  if (webPreview) {
+    server.once('close', () => { void webPreview.close(); });
+    try {
+      await new Promise((resolve, reject) => {
+        webPreview.server.once('error', reject);
+        webPreview.server.listen(previewPort, '127.0.0.1', resolve);
+      });
+    } catch (error) {
+      await webPreview.close();
+      await gracefulShutdown({ exitProcess: false });
+      throw error;
+    }
+  }
 
   try {
     await scheduledTasksRuntime.start();

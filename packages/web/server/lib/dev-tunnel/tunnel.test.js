@@ -96,6 +96,35 @@ describe('dev tunnel path matching', () => {
 });
 
 describe('dev tunnel end to end', () => {
+  test('rejects malformed and ambiguous ports before connecting to a discovered server', async () => {
+    let connections = 0;
+    const devPort = await startDevServer((_req, res) => {
+      connections += 1;
+      res.end('unexpected');
+    });
+    const host = await startHost({ allowedPorts: [devPort] });
+    for (const query of [
+      `port=${devPort}junk`, `port=${devPort}.5`, `port=+${devPort}`,
+      `port=0${devPort}`, `port=${devPort}&port=1`, 'port=', 'port=0', 'port=65536',
+    ]) {
+      const status = await new Promise((resolve, reject) => {
+        const socket = new WebSocket(`ws://127.0.0.1:${host.port}/api/dev-tunnel?${query}`);
+        socket.on('unexpected-response', (_request, response) => {
+          response.resume();
+          resolve(response.statusCode);
+        });
+        socket.on('open', () => {
+          socket.close();
+          reject(new Error(`Accepted invalid query: ${query}`));
+        });
+        socket.on('error', reject);
+      });
+      expect(status).toBe(400);
+    }
+    expect(connections).toBe(0);
+    expect(host.runtime.openSocketCount).toBe(0);
+  });
+
   test('serves the dev server through a local port, unmodified', async () => {
     const devPort = await startDevServer((req, res) => {
       res.setHeader('content-type', 'text/html');

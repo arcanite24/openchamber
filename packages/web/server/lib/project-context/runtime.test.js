@@ -199,6 +199,18 @@ describe('legacy migration', () => {
     }
     expect((await readJson(contextPath())).notes[0].body).toBe('concurrent');
   });
+
+  test('migration reads do not overwrite a concurrent new note', async () => {
+    await writeJson(legacyConfigPath(), { projectNotes: 'legacy', projectTodos: [] });
+    await Promise.all([
+      runtime.readContext(PROJECT_ID),
+      runtime.createNote(PROJECT_ID, { body: 'new note' }),
+      runtime.readContext(PROJECT_ID),
+      runtime.readPlan(PROJECT_ID, 'missing'),
+    ]);
+    const context = await runtime.readContext(PROJECT_ID);
+    expect(context.notes.map((note) => note.body).sort()).toEqual(['legacy', 'new note']);
+  });
 });
 
 describe('long project ids', () => {

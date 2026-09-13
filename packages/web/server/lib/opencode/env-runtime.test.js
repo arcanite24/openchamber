@@ -7,6 +7,7 @@ import { createOpenCodeEnvRuntime } from './env-runtime.js';
 const originalOpencodeBinary = process.env.OPENCODE_BINARY;
 const originalComSpec = process.env.ComSpec;
 const originalPath = process.env.PATH;
+const originalShell = process.env.SHELL;
 const originalLocalAppData = process.env.LOCALAPPDATA;
 const originalSystemRoot = process.env.SystemRoot;
 const originalBundledOpencodeCliDir = process.env.OPENCHAMBER_BUNDLED_OPENCODE_CLI_DIR;
@@ -31,6 +32,8 @@ const setPlatform = (platform) => {
 };
 
 afterEach(() => {
+  if (originalShell === undefined) delete process.env.SHELL;
+  else process.env.SHELL = originalShell;
   if (originalRuntime === undefined) delete process.env.OPENCHAMBER_RUNTIME;
   else process.env.OPENCHAMBER_RUNTIME = originalRuntime;
   Object.defineProperty(process, 'platform', {
@@ -185,9 +188,9 @@ describe('OpenCode env runtime', () => {
     Object.defineProperty(process, 'resourcesPath', { configurable: true, value: undefined });
     process.env.PATH = path.dirname(binary);
     const { runtime, state } = createRuntime({});
-    expect(runtime.ensureOpencodeCliEnv()).toBe(binary);
+    expect(fs.statSync(runtime.ensureOpencodeCliEnv(), { bigint: true }).ino).toBe(fs.statSync(binary, { bigint: true }).ino);
     expect(state.resolvedOpencodeBinarySource).toBe('path');
-    expect(process.env.OPENCODE_BINARY).toBe(binary);
+    expect(fs.statSync(process.env.OPENCODE_BINARY, { bigint: true }).ino).toBe(fs.statSync(binary, { bigint: true }).ino);
   });
 
   it('searches an explicit PATH without mutating the process environment', () => {
@@ -199,7 +202,7 @@ describe('OpenCode env runtime', () => {
     process.env.PATH = defaultDir;
     const { runtime } = createRuntime({});
 
-    expect(runtime.searchPathFor('custom-shell', explicitDir)).toBe(binary);
+    expect(fs.statSync(runtime.searchPathFor('custom-shell', explicitDir), { bigint: true }).ino).toBe(fs.statSync(binary, { bigint: true }).ino);
     expect(process.env.PATH).toBe(defaultDir);
   });
 
@@ -409,7 +412,10 @@ describe('OpenCode env runtime', () => {
   it('bounds every login-shell probe and falls through when one overruns', () => {
     setPlatform('darwin');
     process.env.PATH = createTempDir('openchamber-empty-path-');
-    process.env.SHELL = '/bin/zsh';
+    const shell = path.join(createTempDir('openchamber-test-shell-'), 'zsh');
+    fs.writeFileSync(shell, '#!/bin/sh\n');
+    fs.chmodSync(shell, 0o755);
+    process.env.SHELL = shell;
     delete process.env.OPENCODE_BINARY;
     const shellCalls = [];
     const { runtime } = createRuntime({}, {

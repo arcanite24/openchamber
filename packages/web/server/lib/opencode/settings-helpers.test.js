@@ -90,9 +90,14 @@ describe('settings helpers', () => {
     try {
       mkdirSync(packDir);
       mkdirSync(extractDir);
-      execFileSync('npm', ['pack', '--silent', '--pack-destination', packDir], {
+      const packCommand = process.platform === 'win32'
+        ? [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"npm.cmd pack --silent --pack-destination "${packDir}""`]]
+        : ['npm', ['pack', '--silent', '--pack-destination', packDir]];
+      execFileSync(packCommand[0], packCommand[1], {
         cwd: packagesWebDir,
         stdio: 'pipe',
+        windowsHide: true,
+        windowsVerbatimArguments: process.platform === 'win32',
       });
 
       const tarballName = readdirSync(packDir).find((entry) => entry.endsWith('.tgz'));

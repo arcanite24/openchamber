@@ -1,3 +1,5 @@
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const execFileSync = vi.fn();
@@ -58,7 +60,7 @@ afterEach(() => {
 describe('Claude credential discovery', () => {
   it('prefers the macOS Keychain over a stale credentials file', () => {
     execFileSync.mockReturnValue(claudeCodeBlob('keychain-token'));
-    files.set(`${process.env.HOME}/.claude/.credentials.json`, claudeCodeBlob('file-token'));
+    files.set(path.join(os.homedir(), '.claude', '.credentials.json'), claudeCodeBlob('file-token'));
 
     const credential = withPlatform('darwin', loadClaudeCredential);
 
@@ -69,7 +71,7 @@ describe('Claude credential discovery', () => {
   });
 
   it('reads the credentials file on Linux, where there is no Keychain', () => {
-    files.set(`${process.env.HOME}/.claude/.credentials.json`, claudeCodeBlob('file-token'));
+    files.set(path.join(os.homedir(), '.claude', '.credentials.json'), claudeCodeBlob('file-token'));
 
     const credential = withPlatform('linux', loadClaudeCredential);
 
@@ -80,7 +82,7 @@ describe('Claude credential discovery', () => {
 
   it('honours CLAUDE_CONFIG_DIR when locating the credentials file', () => {
     process.env.CLAUDE_CONFIG_DIR = '/tmp/claude-home';
-    files.set('/tmp/claude-home/.credentials.json', claudeCodeBlob('custom-dir-token'));
+    files.set(path.resolve('/tmp/claude-home', '.credentials.json'), claudeCodeBlob('custom-dir-token'));
 
     expect(withPlatform('linux', loadClaudeCredential).accessToken).toBe('custom-dir-token');
   });

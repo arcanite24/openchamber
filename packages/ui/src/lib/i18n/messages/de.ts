@@ -1,11 +1,15 @@
+import { nativeMcpI18n } from './native-mcp.i18n';
 import { settingsDict } from './de.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { linearPanelI18n } from './linear-panel.i18n';
 
 import { credentialPoolI18n } from './credential-pool.i18n';
+import { nativeAgentI18n } from './native-agent.i18n';
 
 export const dict = {
+  ...nativeMcpI18n["de"],
   ...credentialPoolI18n["de"],
+  ...nativeAgentI18n["de"],
   'sessions.aiRename.action': 'Mit KI umbenennen',
   'sessions.aiRename.generating': 'Sitzungstitel wird generiert...',
   'sessions.aiRename.checking': 'Abgeschlossene Antworten werden geprüft...',

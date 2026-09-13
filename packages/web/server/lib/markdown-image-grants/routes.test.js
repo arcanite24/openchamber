@@ -221,15 +221,22 @@ describe('session image assets', () => {
   });
 
   it('rejects non-image bytes and symlink escapes per source', async () => {
-    const fixture = await createFixture({ sources: ['invalid.png', 'linked.png'] });
+    const linkedSource = process.platform === 'win32' ? 'linked/outside.png' : 'linked.png';
+    const fixture = await createFixture({ sources: ['invalid.png', linkedSource] });
     await fs.writeFile(path.join(fixture.directory, 'invalid.png'), 'not an image');
-    await fs.writeFile(path.join(fixture.root, 'outside.png'), PNG);
-    await fs.symlink(path.join(fixture.root, 'outside.png'), path.join(fixture.directory, 'linked.png'));
+    const outside = path.join(fixture.root, 'outside');
+    await fs.mkdir(outside);
+    await fs.writeFile(path.join(outside, 'outside.png'), PNG);
+    if (process.platform === 'win32') {
+      await fs.symlink(outside, path.join(fixture.directory, 'linked'), 'junction');
+    } else {
+      await fs.symlink(path.join(outside, 'outside.png'), path.join(fixture.directory, 'linked.png'));
+    }
 
     const response = await prepare(fixture.app, fixture.directory, fixture.sources);
     expect(response.body.results).toEqual([
       { source: 'invalid.png', status: 'error' },
-      { source: 'linked.png', status: 'error' },
+      { source: linkedSource, status: 'error' },
     ]);
   });
 });

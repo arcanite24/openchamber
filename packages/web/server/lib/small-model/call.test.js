@@ -160,8 +160,8 @@ describe('callSmallModel — custom provider config', () => {
     });
 
     it('resolves a relative header file from the config layer that defines it', async () => {
-      const configPath = '/config/opencode.json';
-      const secretPath = '/config/gateway-key';
+      const configPath = path.resolve('/config/opencode.json');
+      const secretPath = path.join(path.dirname(configPath), 'gateway-key');
       vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
         if (filePath === secretPath) return 'sub-key\n';
         throw new Error(`Unexpected file read: ${filePath}`);

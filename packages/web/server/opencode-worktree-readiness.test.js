@@ -46,7 +46,9 @@ async function createFixture({ timeoutMs = 1000 } = {}) {
   const app = express();
   app.use(express.json());
   registerOpenCodeProxy(app, {
-    fs: {}, os: {}, path,
+    fs: { readFileSync: () => '{"projects":[]}' },
+    os: { homedir: () => '/fixture-home' },
+    path,
     OPEN_CODE_READY_GRACE_MS: 0,
     WORKTREE_READY_TIMEOUT_MS: timeoutMs,
     getRuntime: () => ({ openCodePort: new URL(upstreamUrl).port, isOpenCodeReady: true }),

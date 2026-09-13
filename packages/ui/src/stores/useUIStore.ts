@@ -999,6 +999,7 @@ interface UIStore {
   reorderContextPanelTabs: (directory: string, activeTabID: string, overTabID: string) => void;
   closeContextPanelTab: (directory: string, tabID: string) => void;
   closeContextPanelTabs: (directory: string, tabIds: readonly string[]) => void;
+  removeContextFilesByPrefix: (directory: string, prefixPath: string) => void;
   closeContextPanel: (directory: string) => void;
   toggleContextPanelExpanded: (directory: string) => void;
   setContextPanelWidth: (directory: string, mode: ContextPanelMode, width: number, availableWidth?: number) => void;
@@ -1636,6 +1637,22 @@ export const useUIStore = create<UIStore>()(
 
         closeContextPanelTab: (directory, tabID) => {
           get().closeContextPanelTabs(directory, [tabID]);
+        },
+
+        removeContextFilesByPrefix: (directory, prefixPath) => {
+          const root = normalizeDirectoryPath(directory.trim());
+          const prefix = normalizeContextTargetPath(prefixPath)?.replace(/\/+$/, '');
+          if (!root || !prefix) return;
+          const compare = (value: string) => /^[A-Za-z]:\//.test(prefix) ? value.toLowerCase() : value;
+          const match = compare(prefix);
+          const tabs = get().contextPanelByDirectory[root]?.tabs ?? [];
+          const ids = tabs.filter((tab) => {
+            if (tab.mode !== 'file' || !tab.targetPath) return false;
+            const target = compare(tab.targetPath.replace(/\\/g, '/'));
+            return target === match || target.startsWith(`${match}/`);
+          }).map((tab) => tab.id);
+          get().closeContextPanelTabs(root, ids);
+          useFilesViewTabsStore.getState().removeOpenPathsByPrefix(root, prefix);
         },
 
         closeContextPanelTabs: (directory, tabIds) => {

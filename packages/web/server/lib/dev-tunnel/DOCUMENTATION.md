@@ -1,5 +1,27 @@
 # Dev Server Tunnel
 
+## Hosted browser previews
+
+`web-preview.js` serves remote HTTP dev apps on a separate loopback listener.
+`OPENCHAMBER_PREVIEW_DOMAIN` selects the preview DNS suffix and
+`OPENCHAMBER_PREVIEW_PORT` selects that listener. Hosting requires the existing
+owner-gate configuration. Each dev port has its own HTTPS origin at
+`p-<port>.<preview-domain>`, keeping root-relative assets and HMR paths intact.
+The ingress must authenticate these hosts and provide TLS before enabling them.
+
+The authenticated `/api/dev-servers/preview?url=...` route resolves loopback
+addresses for the web browser. An unconfigured host returns 501. Resolution and
+every HTTP request or WebSocket upgrade check discovery; failed discovery does
+not grant access. Preview hosts never dispatch administration API routes.
+
+The proxy strips ingress identity, authorization and the default shared
+OAuth2 Proxy/OpenChamber cookies before forwarding. App cookies remain local to
+each preview host, including cookies set during WebSocket handshakes. Deployments
+using a custom authentication cookie name must extend the reserved-cookie filter
+before enabling previews. Responses retain their original bodies and paths.
+Remote Electron keeps its existing TCP tunnel. Deferred runtime packages do not
+gain a new native bridge; unsupported remote web hosting fails explicitly.
+
 ## Purpose
 
 This module carries raw TCP bytes between a desktop client and a dev server

@@ -51,7 +51,7 @@ describe('OpenChamber control service', () => {
   it('serves project and model projections without an HTTP or CLI round trip', async () => {
     const { service } = createService();
     await expect(service.execute('projects.list')).resolves.toEqual({
-      projects: [{ id: 'project-1', path: '/repo', label: 'Repo' }],
+      projects: [{ id: 'project-1', path: path.resolve('/repo'), label: 'Repo' }],
     });
     await expect(service.execute('models.list')).resolves.toEqual(expect.objectContaining({
       defaultModel: 'provider/model',

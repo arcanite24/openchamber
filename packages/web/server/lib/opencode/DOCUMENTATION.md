@@ -1,6 +1,7 @@
 # OpenCode Module Documentation
 
 ## Purpose
+Settings and preferences are replaced atomically. If bounded Windows rename retries fail, the write fails with the previous file intact; the runtime never copies over a live file as a fallback. Failed staged writes are cleaned up.
 This module provides OpenCode server integration utilities for the web server runtime, including configuration management and provider authentication.
 
 In OMP mode, the proxy validates browser Origin against `OPENCHAMBER_PUBLIC_ORIGIN`

@@ -1017,13 +1017,13 @@ describe('isOpenchamberProcessRunning', () => {
     expect(isOpenchamberProcessRunning(2147483646)).toBe(false);
   });
 
-  // Identity verification is available on Linux (/proc) and macOS (ps); on those
+  // Identity verification is available on Linux (/proc), macOS (ps), and Windows (CIM); on those
   // platforms a live but unrelated process (a recycled stale PID) must read as
   // not-running so it can't trip the "already running" guard (issue #1721).
-  it.skipIf(process.platform !== 'linux' && process.platform !== 'darwin')(
+  it.skipIf(!['linux', 'darwin', 'win32'].includes(process.platform))(
     'returns false for a live non-OpenChamber PID',
     async () => {
-      const child = spawn('sleep', ['30'], { stdio: 'ignore' });
+      const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore', windowsHide: true });
       try {
         await new Promise((resolve) => setTimeout(resolve, 150));
         expect(isOpenchamberProcessRunning(child.pid)).toBe(false);
@@ -1363,7 +1363,7 @@ describe('lifecycle commands with unmanaged explicit ports', () => {
 
         expect(fs.existsSync(pidFile)).toBe(false);
         expect(fs.existsSync(instanceFile)).toBe(false);
-        expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
+        await expect.poll(() => child.exitCode !== null || child.signalCode !== null).toBe(true);
       } finally {
         child.kill('SIGKILL');
       }
@@ -1373,7 +1373,7 @@ describe('lifecycle commands with unmanaged explicit ports', () => {
   it('plain stop ignores a stale CLI registry entry that resolves to desktop runtime', async () => {
     await withTempOpenChamberDataDir(async () => {
       const server = await startMockOpenChamberServer({ runtime: 'desktop' });
-      const child = spawn('sleep', ['30'], { stdio: 'ignore' });
+      const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore', windowsHide: true });
       const pidFile = await getPidFilePath(server.port);
       const instanceFile = await getInstanceFilePath(server.port);
       try {

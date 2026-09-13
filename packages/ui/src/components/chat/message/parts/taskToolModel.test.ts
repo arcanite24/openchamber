@@ -6,11 +6,18 @@ import {
     parseTaskMetadataBlock,
     prepareTaskToolOutput,
     readTaskSessionIdFromRecord,
+    readTaskSessionIdsFromRecord,
     readTaskSessionIdFromOutput,
 } from './taskToolModel';
 import { TOOL_OUTPUT_MAX_CHARS } from '../toolRenderers';
 
 describe('taskToolModel', () => {
+    test('retains each batch child and accepts legacy single-child metadata', () => {
+        expect(readTaskSessionIdsFromRecord({ sessionID: 'first', sessionIDs: ['first', ' second ', null, '', 4, 'second'] })).toEqual(['first', 'second']);
+        expect(readTaskSessionIdsFromRecord({ sessionId: 'legacy' })).toEqual(['legacy']);
+        expect(readTaskSessionIdsFromRecord({ sessionIDs: ['child'] })).toEqual(['child']);
+        expect(readTaskSessionIdsFromRecord(null)).toEqual([]);
+    });
     test('reads the current OpenCode running-state identity contract', () => {
         expect(readTaskSessionIdFromRecord({ sessionId: 'child-live' })).toBe('child-live');
         expect(readTaskSessionIdFromRecord({})).toBe(undefined);

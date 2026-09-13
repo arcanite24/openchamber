@@ -79,6 +79,7 @@ These modules hold reusable, non-presentational logic for commands.
   - Data, run, log, settings, tunnel profile, and managed-local config paths.
 
 - `cli-settings-accessors.js`
+  - Atomic replacement failures preserve the previous settings and propagate the error after bounded Windows retries. No direct-copy fallback is allowed; failed staged replacements are cleaned up.
   - Minimal settings.json read/write for CLI contexts that must not load the
     full web settings runtime (`connect-url` relay identity resolution).
   - Mirrors the settings runtime's guarantees so a CLI read-modify-write can
@@ -92,6 +93,7 @@ These modules hold reusable, non-presentational logic for commands.
 
 - `cli-process.js`
   - PID files, instance registry files, process identity checks, runtime metadata checks, and process termination helpers.
+  - Windows identity checks use a bounded, non-interactive PowerShell CIM query for a validated numeric PID. Failed or unreadable queries remain unknown, so registry-based stopping still requires a positive identity match.
 
 - `cli-lifecycle.js`
   - Instance discovery, live health probing, attachability checks, provider discovery, and status aggregation used by lifecycle/status/tunnel commands.

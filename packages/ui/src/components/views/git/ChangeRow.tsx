@@ -75,6 +75,7 @@ export const ChangeRow = React.memo<ChangeRowProps>(function ChangeRow({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
+      if (event.target !== event.currentTarget) return;
       if (event.key === ' ') {
         event.preventDefault();
         onAction();

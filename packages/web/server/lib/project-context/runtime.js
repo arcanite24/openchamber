@@ -371,10 +371,8 @@ export const createProjectContextRuntime = (deps) => {
    * that did not succeed.
    *
    * Deliberately does NOT take the write lock: every mutator calls this while
-   * already holding it, so locking here would deadlock. The legacy migration
-   * it can trigger is safe unlocked — both of its writes are atomic renames
-   * of identical content, so concurrent migrations converge instead of
-   * interleaving.
+   * already holding it, so locking here would deadlock. Public read methods
+   * acquire that same lock because legacy migration also writes files.
    */
   const readStoredContext = async (projectId) => {
     const now = Date.now();
@@ -885,12 +883,12 @@ export const createProjectContextRuntime = (deps) => {
   };
 
   return {
-    readContext,
+    readContext: (projectId) => withWriteLock(projectId, () => readContext(projectId)),
     saveTodos,
     createNote,
     updateNote,
     deleteNote,
-    readPlan,
+    readPlan: (projectId, planId) => withWriteLock(projectId, () => readPlan(projectId, planId)),
     updatePlan,
     createPlan,
     setPlanPinned,

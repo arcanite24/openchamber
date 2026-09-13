@@ -10,7 +10,7 @@ import { useI18n } from '@/lib/i18n';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { resolveGlobalSessionDirectory, useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
-import { useSessionUIStore } from '@/sync/session-ui-store';
+import { routeMessage, useSessionUIStore } from '@/sync/session-ui-store';
 import { useAllLiveSessions } from '@/sync/sync-context';
 import { getSyncMessages, getSyncParts } from '@/sync/sync-refs';
 import { flattenAssistantTextParts } from '@/lib/messages/messageText';
@@ -166,13 +166,13 @@ export function MultiRunFusionDialog({
       useSessionUIStore.getState().setCurrentSession(fusionSession.id, directory);
       onOpenChange(false);
 
-      await opencodeClient.sendMessage({
-        id: fusionSession.id,
+      await routeMessage({
+        sessionId: fusionSession.id,
         providerID,
         modelID,
         variant: variant || undefined,
         agent: agent || undefined,
-        text: visiblePrompt,
+        content: visiblePrompt,
         additionalParts: [
           { text: instructionsPrompt, synthetic: true },
           ...usableSources.map((item, index) => ({ text: buildSourcePart(item.source, item.text, index), synthetic: true })),

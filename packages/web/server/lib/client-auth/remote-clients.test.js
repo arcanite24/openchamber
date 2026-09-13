@@ -100,7 +100,7 @@ describe('remote client auth runtime', () => {
     }
   });
 
-  it('keeps the token store private on disk', async () => {
+  it.skipIf(process.platform === 'win32')('keeps the token store private with POSIX permissions', async () => {
     const { dir, runtime } = await createRuntime();
     try {
       await runtime.createClient({ label: 'Laptop' });

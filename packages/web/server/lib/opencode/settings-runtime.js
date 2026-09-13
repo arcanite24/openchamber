@@ -648,19 +648,7 @@ export const createSettingsRuntime = (deps) => {
       }
     }
 
-    if (!isTransientWindowsReplaceError(lastError)) {
-      throw lastError;
-    }
-
-    // Windows can transiently reject atomic replacement when another process
-    // briefly opens the target file. Preserve atomic rename everywhere it works,
-    // but fall back to a direct replacement so settings persistence does not
-    // get permanently wedged on Windows desktop installs.
-    try {
-      await fsPromises.copyFile(tmp, target);
-    } finally {
-      await fsPromises.rm(tmp, { force: true }).catch(() => {});
-    }
+    throw lastError;
   };
 
   const cleanupOrphanedSettingsTempFiles = async (directory) => {

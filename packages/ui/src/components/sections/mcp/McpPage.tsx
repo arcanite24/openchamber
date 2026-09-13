@@ -54,6 +54,9 @@ import {
 import { Icon } from "@/components/icon/Icon";
 import { SortableTabsStrip, type SortableTabsStripItem } from '@/components/ui/sortable-tabs-strip';
 import { useI18n } from '@/lib/i18n';
+import { useConfigStore } from '@/stores/useConfigStore';
+import { useSyncRuntime } from '@/sync/sync-context';
+import { NativeMcpPage } from './NativeMcpPage';
 
 // ─────────────────────────────────────────────────────────────
 // CommandTextarea  — one arg per line, paste-friendly
@@ -550,6 +553,13 @@ const buildMcpRuntimeActionKey = (name: string | null, directory?: string | null
 // McpPage
 // ─────────────────────────────────────────────────────────────
 export const McpPage: React.FC = () => {
+  const native = useConfigStore(state => state.agents.some(agent => agent.options?.runtime === 'omp'));
+  const directory = useSettingsDirectory();
+  const { runtimeKey } = useSyncRuntime();
+  return native ? <NativeMcpPage key={JSON.stringify([runtimeKey, directory])} directory={directory} /> : <OpenCodeMcpPage />;
+};
+
+const OpenCodeMcpPage: React.FC = () => {
   const { t } = useI18n();
   const tUnsafe = React.useCallback(
     (key: string, params?: Record<string, unknown>) => t(key as never, params as never),

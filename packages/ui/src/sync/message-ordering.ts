@@ -9,11 +9,19 @@ const getCreatedAt = (message: Message): number => {
  * Message IDs identify records; they are not chronology. OpenCode's sortable
  * ID timestamp rolls over, so a newly created `msg_000...` can follow a legacy
  * `msg_fff...`. Creation time is the authoritative transcript order, with ID
- * used only to make equal timestamps deterministic.
+ * used only to make equal timestamps deterministic within a parent/reply group.
  */
 export const compareMessagesChronologically = (left: Message, right: Message): number => {
   const createdAtDifference = getCreatedAt(left) - getCreatedAt(right)
   if (createdAtDifference !== 0) return createdAtDifference
+  // Millisecond timestamps can tie. Keep replies after their authoritative
+  // parent without changing persisted IDs or inventing timestamp offsets.
+  const leftTurn = left.role === "assistant" && left.parentID ? left.parentID : left.id
+  const rightTurn = right.role === "assistant" && right.parentID ? right.parentID : right.id
+  if (leftTurn < rightTurn) return -1
+  if (leftTurn > rightTurn) return 1
+  if (left.id === leftTurn && right.id !== rightTurn) return -1
+  if (right.id === rightTurn && left.id !== leftTurn) return 1
   if (left.id < right.id) return -1
   if (left.id > right.id) return 1
   return 0

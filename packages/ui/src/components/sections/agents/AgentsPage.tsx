@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { Icon } from '@/components/icon/Icon';
 import { AgentPermissionsEditor } from './AgentPermissionsEditor';
+import { NativeAgentEditor } from './NativeAgentEditor';
 
 type AgentVariantProvider = {
   id: string;
@@ -274,6 +275,11 @@ export const AgentsPage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (agents.some(agent => agent.options?.runtime === 'omp')) {
+    const nativeScope = selectedAgent?.options?.scope === 'project' ? 'project' : 'user';
+    return <NativeAgentEditor key={`${settingsDirectory}:${selectedAgentName}`} name={selectedAgentName} directory={settingsDirectory} initialScope={isNewAgent ? agentDraft?.scope ?? 'user' : nativeScope} isNew={isNewAgent} initialContent={isNewAgent ? agentDraft?.nativeContent : undefined} />;
   }
 
   return (

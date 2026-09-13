@@ -1,11 +1,9 @@
-import path from 'node:path';
-import os from 'node:os';
 import { describe, expect, it } from 'vitest';
 
 import { pathLooksUserConfigured, mergePathValues } from './path-utils.js';
 
-const home = os.homedir();
-const delim = path.delimiter;
+const home = '/home/test';
+const delim = ':';
 
 describe('pathLooksUserConfigured', () => {
   it('returns false for empty or non-string values', () => {
@@ -49,6 +47,9 @@ describe('pathLooksUserConfigured', () => {
 });
 
 describe('mergePathValues', () => {
+  it('merges Windows paths without splitting drive letters', () => {
+    expect(mergePathValues('C:\\tools;D:\\bin', 'D:\\bin;E:\\apps', ';')).toBe('C:\\tools;D:\\bin;E:\\apps');
+  });
   it('returns empty string for empty inputs', () => {
     expect(mergePathValues('', '', delim)).toBe('');
   });

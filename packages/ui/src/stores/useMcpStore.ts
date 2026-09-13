@@ -154,7 +154,8 @@ export const useMcpStore = create<McpStore>()(
         const api = getMcpApiClient(directory);
         const result = await api.mcp.status();
         if (generation !== mcpGeneration) return;
-        const data = (result.data ?? {}) as McpStatusMap;
+        if (!result.response.ok || result.error || result.data === undefined) throw new Error('Failed to load MCP status');
+        const data = result.data;
 
         set((state) => ({
           byDirectory: { ...state.byDirectory, [key]: data },

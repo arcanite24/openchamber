@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import path from 'node:path';
 import express from 'express';
 import request from 'supertest';
 import { registerOpenCodeRoutes } from './routes.js';
@@ -21,13 +22,14 @@ const createApp = (overrides = {}) => {
 describe('OpenCode project directory route', () => {
   it('creates and activates a requested project outside the active workspace', async () => {
     const { app, dependencies } = createApp();
+    const projectPath = path.resolve('/projects/testing-one');
 
     const response = await request(app)
       .post('/api/opencode/directory')
       .send({ path: '/projects/testing-one', create: true })
       .expect(200);
 
-    expect(dependencies.fsPromises.mkdir).toHaveBeenCalledWith('/projects/testing-one', { recursive: true });
+    expect(dependencies.fsPromises.mkdir).toHaveBeenCalledWith(projectPath, { recursive: true });
     expect(dependencies.validateDirectoryPath).toHaveBeenCalledWith('/projects/testing-one');
     expect(response.body).toMatchObject({ success: true, path: '/projects/testing-one' });
   });

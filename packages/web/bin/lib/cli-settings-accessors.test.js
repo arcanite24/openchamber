@@ -78,6 +78,20 @@ const countTornReads = async (filePath, writer, iterations) => {
 };
 
 describe('cli settings accessors', () => {
+  it('preserves existing settings when atomic replacement fails', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'settings.json');
+      fs.writeFileSync(filePath, '{"theme":"light"}');
+      const accessors = makeAccessors(dir, { fsPromises: {
+        ...fs.promises,
+        rename: async () => { throw Object.assign(new Error('replacement denied'), { code: 'EPERM' }); },
+      } });
+      await expect(accessors.writeSettingsToDisk({ theme: 'dark' })).rejects.toMatchObject({ code: 'EPERM' });
+      expect(fs.readFileSync(filePath, 'utf8')).toBe('{"theme":"light"}');
+      expect(fs.readdirSync(dir)).toEqual(['settings.json']);
+    });
+  });
+
   it('persists the full object atomically and cleans up its tmp file', async () => {
     await withTempDir(async (dir) => {
       const accessors = makeAccessors(dir);

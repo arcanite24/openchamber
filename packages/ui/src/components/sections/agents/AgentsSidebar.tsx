@@ -1,4 +1,7 @@
 import React, { useMemo } from 'react';
+import YAML from 'yaml';
+import { z } from 'zod';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui';
@@ -220,7 +223,7 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
     setIsConfirmActionPending(false);
   };
 
-  const handleDuplicateAgent = (agent: Agent) => {
+  const handleDuplicateAgent = async (agent: Agent) => {
     const baseName = agent.name;
     let copyNumber = 1;
     let newName = `${baseName}-copy`;
@@ -228,6 +231,26 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
     while (agents.some((a) => a.name === newName)) {
       copyNumber++;
       newName = `${baseName}-copy-${copyNumber}`;
+    }
+
+    if (agent.options?.runtime === 'omp') {
+      try {
+        const scope = agent.options.scope === 'project' ? 'project' : 'user';
+        const query = new URLSearchParams({ name: agent.name, scope, inherit: 'true' });
+        if (settingsDirectory) query.set('directory', settingsDirectory);
+        const response = await runtimeFetch(`/api/omp/agent-definition?${query}`);
+        if (!response.ok) throw new Error('Native agent read failed');
+        const { content } = z.object({ content: z.string() }).parse(await response.json());
+        const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
+        if (!match) throw new Error('Missing native frontmatter');
+        const document = YAML.parseDocument(match[1]);
+        document.set('name', newName);
+        const nativeContent = `---\n${document.toString().trimEnd()}\n---\n${content.slice(match[0].length)}`;
+        setAgentDraft({ name: newName, scope, nativeContent });
+        setSelectedAgent(newName);
+        onItemSelect?.();
+      } catch { toast.error(t('settings.agents.page.toast.saveUnexpectedError')); }
+      return;
     }
 
     // Set draft with prefilled values from source agent
@@ -276,6 +299,25 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
 
     if (agents.some((a) => a.name === sanitizedName)) {
       toast.error(t('settings.agents.sidebar.toast.agentExists'));
+      return;
+    }
+
+    if (renameDialogAgent.options?.runtime === 'omp') {
+      try {
+        const scope = renameDialogAgent.options.scope;
+        if (scope !== 'user' && scope !== 'project') throw new Error('No saved definition');
+        const query = new URLSearchParams({ name: renameDialogAgent.name, scope });
+        if (settingsDirectory) query.set('directory', settingsDirectory);
+        const response = await runtimeFetch(`/api/omp/agent-definition?${query}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: sanitizedName }),
+        });
+        if (!response.ok) throw new Error('Native rename failed');
+        if (!await useAgentsStore.getState().loadAgents(settingsDirectory, true)) throw new Error('Agent refresh failed');
+        setSelectedAgent(sanitizedName);
+        setRenameDialogAgent(null);
+        toast.success(t('settings.agents.sidebar.toast.agentRenamed', { name: sanitizedName }));
+      } catch { toast.error(t('settings.agents.sidebar.toast.renameFailed')); }
       return;
     }
 

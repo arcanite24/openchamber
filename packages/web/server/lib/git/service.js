@@ -803,6 +803,9 @@ const normalizeUpstreamTarget = (remote, branch) => {
 };
 
 const parseGitErrorText = (error) => {
+  if (error?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+    return error.message || 'Git output exceeded maxBuffer';
+  }
   const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
   const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
   const message = typeof error?.message === 'string' ? error.message : '';
@@ -1013,6 +1016,10 @@ const isFilenameTooLongError = (message) => /file ?name too long/i.test(String(m
 
 const formatWorktreePopulateError = (message) => {
   const text = String(message || '').trim() || 'Failed to populate worktree';
+  const invalidDirectory = /cannot create directory at '([^']+)': Invalid argument/i.exec(text)?.[1];
+  if (process.platform === 'win32' && invalidDirectory?.split(/[\\/]/).some((component) => component.length > 255)) {
+    return `${text}\nA directory name exceeds the filesystem's component path-length limit. Shorten that name in the repository; enabling long paths cannot remove this limit.`;
+  }
   if (!isFilenameTooLongError(text)) {
     return text;
   }
@@ -1118,7 +1125,7 @@ const runPostCheckoutHook = async (directory) => {
   if (!head || !gitDir) return;
 
   try {
-    await execFileAsync(hookPath, [GIT_NULL_REF, head, '1'], {
+    await execFileAsync(getGitBinary(), ['hook', 'run', '--ignore-missing', 'post-checkout', '--', GIT_NULL_REF, head, '1'], {
       cwd: directory,
       env: {
         ...(await buildGitEnv()),
@@ -1711,10 +1718,11 @@ const runWorktreeStartCommand = async (directory, command) => {
   }
 
   if (process.platform === 'win32') {
-    const result = await execFileAsync('cmd', ['/c', text], {
+    const result = await execFileAsync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${text}"`], {
       cwd: directory,
       env: await buildGitEnv(),
       windowsHide: true,
+      windowsVerbatimArguments: true,
       maxBuffer: 20 * 1024 * 1024,
     }).then(({ stdout, stderr }) => ({ success: true, stdout, stderr })).catch((error) => ({
       success: false,
@@ -2477,7 +2485,7 @@ const getNoIndexDiff = async (repoRoot, repoPath, contextLines) => {
   if (result.exitCode === 0 || result.exitCode === 1) {
     return result.stdout;
   }
-  throw new Error(result.stderr || result.message || 'Failed to get untracked Git diff');
+  throw new Error(result.message || result.stderr || 'Failed to get untracked Git diff');
 };
 
 export async function getDiff(directory, { path: filePath, staged = false, contextLines = 3 } = {}) {

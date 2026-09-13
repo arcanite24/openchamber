@@ -49,6 +49,7 @@ import {
     prepareTaskToolOutput,
     readTaskSessionIdFromOutput,
     readTaskSessionIdFromRecord,
+    readTaskSessionIdsFromRecord,
     type TaskToolSummaryEntry,
 } from './taskToolModel';
 import { areRenderRelevantPartsEqual } from '../renderCompare';
@@ -1007,11 +1008,12 @@ const TaskToolSummary: React.FC<{
     isMobile: boolean;
     output?: string;
     sessionId?: string;
+    sessionIds: string[];
     onShowPopup?: (content: ToolPopupContent) => void;
     input?: Record<string, unknown>;
     animateTailText?: boolean;
     isActive?: boolean;
-}> = ({ entries, isExpanded, isMobile, output, sessionId, onShowPopup, input, animateTailText = true, isActive = false }) => {
+}> = ({ entries, isExpanded, isMobile, output, sessionId, sessionIds, onShowPopup, input, animateTailText = true, isActive = false }) => {
     const { t } = useI18n();
     const currentDirectory = useEffectiveDirectory();
     const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
@@ -1023,7 +1025,7 @@ const TaskToolSummary: React.FC<{
     const hasOutput = trimmedOutput.length > 0;
     const [isOutputExpanded, setIsOutputExpanded] = React.useState(false);
 
-    const handleOpenSession = (event: React.MouseEvent) => {
+    const handleOpenSession = (event: React.MouseEvent, sessionId: string) => {
         event.stopPropagation();
         if (sessionId && currentDirectory) {
             // In contexts with no ContextPanel (embedded session-chat iframe)
@@ -1075,17 +1077,18 @@ const TaskToolSummary: React.FC<{
                 />
             ) : null}
 
-            {sessionId && (
+            {sessionIds.map((childId, index) => (
                 <button
+                    key={childId}
                     type="button"
                     className="flex items-center gap-2 typography-meta text-primary hover:text-primary/80 w-full"
                     onPointerDown={(event) => event.stopPropagation()}
-                    onClick={handleOpenSession}
+                    onClick={(event) => handleOpenSession(event, childId)}
                 >
                     <Icon name="external-link" className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="typography-meta text-primary font-medium">{t('chat.toolPart.openSubtask', { type: agentType.charAt(0).toUpperCase() + agentType.slice(1) })}</span>
+                    <span className="typography-meta text-primary font-medium">{t('chat.toolPart.openSubtask', { type: `${agentType.charAt(0).toUpperCase() + agentType.slice(1)}${sessionIds.length > 1 ? ` ${index + 1}` : ''}` })}</span>
                 </button>
-            )}
+            ))}
 
             {hasOutput ? (
                 <div className={cn('space-y-1', (entries.length > 0 || sessionId) && 'pt-1')}
@@ -1862,6 +1865,10 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     }, [isTaskTool, metadata, parsedTaskMetadata.sessionId, partMetadata, taskOutputString]);
 
     const childSessionLookupId = hasFinalMetadataTaskSummary ? '' : (taskSessionId ?? '');
+    const taskSessionIds = React.useMemo(() => {
+        const ids = readTaskSessionIdsFromRecord(metadata);
+        return ids.length ? ids : (taskSessionId ? [taskSessionId] : []);
+    }, [metadata, taskSessionId]);
 
     const childSessionMessages = useSessionMessageRecords(childSessionLookupId, currentDirectory);
     useEnsureSessionMessages(childSessionLookupId, currentDirectory);
@@ -2258,6 +2265,7 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
                     isMobile={isMobile}
                     output={taskOutputString}
                     sessionId={taskSessionId}
+                    sessionIds={taskSessionIds}
                     onShowPopup={onShowPopup}
                     input={input}
                     animateTailText={animateTailText}

@@ -7,9 +7,11 @@
  * an equivalent local port and pipes it to the host, so the same page loads
  * from a real local origin with nothing rewritten.
  *
- * Everywhere else — local runtime, web, mobile — the URL is already correct and
- * is returned untouched.
+ * Remote web previews use the server's authenticated preview origin. Local
+ * runtimes keep their loopback URL.
  */
+import { z } from 'zod';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import { invokeDesktopCommand, listenForDesktopRelayDevTunnels, postDesktopRelayDevTunnelMessage } from '@/lib/desktopNative';
 import { getRuntimeBearerTokenSync, getRuntimeExtraHeadersSync, refreshRuntimeUrlAuthToken } from '@/lib/runtime-auth';
 import { getActiveRelayTunnel, isRelayModeActive } from '@/lib/relay/runtime-tunnel';
@@ -72,7 +74,7 @@ listenForDesktopRelayDevTunnels(({ connectionId, remotePort, message }) => {
 });
 
 const isDesktopRuntime = (): boolean => (
-  typeof window !== 'undefined' && Boolean(window.__OPENCHAMBER_ELECTRON__)
+  Boolean(globalThis.window?.__OPENCHAMBER_ELECTRON__)
 );
 
 /**
@@ -81,10 +83,9 @@ const isDesktopRuntime = (): boolean => (
  * which would only add a hop.
  */
 const isRemoteRuntime = (baseUrl: string): boolean => {
-  if (!baseUrl) return false;
   try {
-    const parsed = new URL(baseUrl, typeof window !== 'undefined' ? window.location.href : undefined);
-    const localOrigin = typeof window !== 'undefined' ? window.__OPENCHAMBER_LOCAL_ORIGIN__ : '';
+    const parsed = new URL(baseUrl || '.', globalThis.window?.location.href);
+    const localOrigin = globalThis.window?.__OPENCHAMBER_LOCAL_ORIGIN__;
     if (localOrigin && parsed.origin === localOrigin) return false;
     return !isLoopbackUrl(parsed.toString());
   } catch {
@@ -134,6 +135,8 @@ export class DevTunnelUnavailableError extends Error {
   }
 }
 
+const webPreviewResponse = z.object({ url: z.string().url() });
+
 /**
  * Returns the URL the browser view should actually load.
  *
@@ -146,13 +149,32 @@ export class DevTunnelUnavailableError extends Error {
  * authentication rejected. None of that should look like a page.
  */
 export const resolveBrowsableUrl = async (url: string): Promise<string> => {
-  if (!url || !isDesktopRuntime() || !isLoopbackUrl(url)) return url;
+  if (!url || !isLoopbackUrl(url)) return url;
 
   const baseUrl = getRuntimeApiBaseUrl();
-  if (!isRemoteRuntime(baseUrl)) return url;
+  // A hosted browser can use a loopback agent endpoint from the server's point
+  // of view. The page itself is still remote and needs the preview origin.
+  const hostedWeb = !isDesktopRuntime() && !isLoopbackUrl(globalThis.window?.location.href || '');
+  if (!isRemoteRuntime(baseUrl) && !hostedWeb) return url;
 
   const port = loopbackPort(url);
   if (!port) return url;
+
+  if (!isDesktopRuntime()) {
+    const runtimeKey = getRuntimeKey();
+    try {
+      const response = await runtimeFetch(`/api/dev-servers/preview?${new URLSearchParams({ url })}`);
+      if (!response.ok) throw new DevTunnelUnavailableError(url);
+      const preview = new URL(webPreviewResponse.parse(await response.json()).url);
+      const runtimeOrigin = new URL(hostedWeb ? window.location.href : (baseUrl || '.'), window.location.href).origin;
+      if (preview.protocol !== 'https:' || preview.origin === runtimeOrigin || preview.username || preview.password || runtimeKey !== getRuntimeKey()) {
+        throw new DevTunnelUnavailableError(url);
+      }
+      return preview.href;
+    } catch {
+      throw new DevTunnelUnavailableError(url);
+    }
+  }
 
   const key = `${baseUrl}|${port}`;
   const cached = localPortByTarget.get(key);
@@ -237,6 +259,6 @@ const resetDevTunnelCache = (): void => {
   void invokeDesktopCommand('desktop_relay_dev_tunnel_close_all').catch(() => {});
 };
 
-if (typeof window !== 'undefined') {
+if (globalThis.window) {
   subscribeRuntimeEndpointChanged(resetDevTunnelCache);
 }

@@ -1125,6 +1125,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
         role="button"
         tabIndex={0}
         onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onToggleCollapsedGroup(groupKey);

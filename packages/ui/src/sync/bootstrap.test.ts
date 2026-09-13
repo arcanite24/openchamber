@@ -4,16 +4,18 @@ import { bootstrapDirectory } from "./bootstrap"
 import { INITIAL_STATE, type State } from "./types"
 
 const createSdk = (options?: {
+  mcpScope?: string
+  mcpStatus?: () => Promise<{ data: State['mcp'] }>
   commandList?: () => Promise<{ data: unknown[] }>
   sessionStatus?: () => Promise<{ data: State['session_status'] }>
   questionList?: () => Promise<{ data?: unknown[]; error?: unknown; response?: { status?: number } }>
 }) => ({
   project: { current: async () => ({ data: { id: "project-a" } }) },
-  config: { get: async () => ({ data: {} }) },
+  config: { get: async () => ({ data: {}, response: new Response(null, { headers: options?.mcpScope ? { 'X-OMP-MCP-Scope': options.mcpScope } : {} }) }) },
   path: { get: async () => ({ data: { state: "", config: "", worktree: "/repo", directory: "/repo", home: "/home" } }) },
   session: { status: options?.sessionStatus ?? (async () => ({ data: {} })) },
   command: { list: options?.commandList ?? (async () => ({ data: [] })) },
-  mcp: { status: async () => ({ data: {} }) },
+  mcp: { status: options?.mcpStatus ?? (async () => ({ data: {} })) },
   lsp: { status: async () => ({ data: [] }) },
   vcs: { get: async () => ({ data: { branch: "main" } }) },
   question: { list: options?.questionList ?? (async () => ({ data: [] })) },
@@ -29,6 +31,25 @@ const createState = (): State => ({
 const project = { id: "project-a", worktree: "/repo" } as Project
 
 describe("bootstrapDirectory", () => {
+  for (const scope of [undefined, 'session', 'unrecognized']) {
+    test(`respects declared MCP scope ${scope} without fabricating status`, async () => {
+      const cached: State['mcp'] = { cached: { status: 'connected' } }
+      let state = { ...createState(), mcp: cached }
+      let requests = 0
+      await bootstrapDirectory({
+        directory: '/repo',
+        sdk: createSdk({ mcpScope: scope, mcpStatus: async () => { requests++; return { data: {} } } }),
+        getState: () => state,
+        set: patch => { state = { ...state, ...patch } },
+        global: { config: {}, projects: [project] },
+        loadSessions: () => {},
+      })
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(requests).toBe(scope === 'session' ? 0 : 1)
+      expect(state.mcp).toEqual(scope === 'session' ? cached : {})
+    })
+  }
+
   test("prioritizes session loading without waiting for deferred fields", async () => {
     let state = createState()
     let deferredStarted = false
