@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 test('remote web previews use the authenticated resolver and reject unavailable or unsafe responses', async () => {
-  let previewUrl = 'https://p-5173.preview.example.test/nested?q=1#section';
+  let previewUrl: string | null = 'https://p-5173.preview.example.test/nested?q=1#section';
   let status = 200;
   const requests: string[] = [];
   const server = http.createServer((req, res) => {
@@ -37,6 +37,8 @@ test('remote web previews use the authenticated resolver and reject unavailable 
       previewUrl = invalid;
       await expect(resolveBrowsableUrl(target)).rejects.toThrow(DevTunnelUnavailableError);
     }
+    previewUrl = null;
+    await expect(resolveBrowsableUrl(target)).rejects.toThrow(DevTunnelUnavailableError);
     status = 501;
     await expect(resolveBrowsableUrl(target)).rejects.toThrow(DevTunnelUnavailableError);
     expect(await resolveBrowsableUrl('https://example.test/docs')).toBe('https://example.test/docs');

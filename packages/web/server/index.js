@@ -1944,7 +1944,10 @@ async function main(options = {}) {
     try {
       res.json({ url: await webPreview.resolveUrl(values[0]) });
     } catch (error) {
-      res.status(503).json({ error: error.message });
+      // A saved preview can outlive its dev server. Report that expected state
+      // in-band so reopening Settings does not fill the browser console with
+      // failed requests; the browser pane already renders its retry state.
+      res.json({ url: null, error: error.message });
     }
   });
 

@@ -21,7 +21,7 @@ web suite passed apart from one transient Windows `EPERM` rename that passed
 10/10 when rerun alone.
 
 The companion executable is `omp/18.1.18`, SHA-256
-`950DD4B27A65BA839083E3C90A65C9CFEF5D927A609168B1ECE971E482968A33`.
+`F846C71900C8498D71C12FC06BA477CD2A515081B5B1331093C197738AF34D75`.
 Deployment, backups, and rollback are documented in
 `C:\Users\neri\arrstack\DOMAIN.md`.
 

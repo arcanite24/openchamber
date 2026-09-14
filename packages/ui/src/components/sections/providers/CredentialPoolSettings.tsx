@@ -1,8 +1,10 @@
 import React from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/components/ui/toast';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { reportSettingsSaveState } from '@/lib/persistence';
@@ -28,6 +30,7 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
   const [busy, setBusy] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
   const [key, setKey] = React.useState('');
+  const [removeAccount, setRemoveAccount] = React.useState<Pool['accounts'][number] | null>(null);
   const editVersion = React.useRef(0);
 
   const refresh = React.useCallback(async (signal?: AbortSignal) => {
@@ -56,6 +59,11 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
     setPool(current => current ? update(current) : current);
   };
   const date = (value: number | null) => value ? new Date(value).toLocaleString(getCurrentIntlLocale()) : t('settings.providers.pool.unknown');
+  const mutationFailed = () => {
+    setFailed(true);
+    reportSettingsSaveState('error');
+    toast.error(t('settings.providers.pool.saveFailed'));
+  };
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -64,18 +72,19 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
     reportSettingsSaveState('saving');
     try {
       const settings = await runtimeFetch('/api/omp/pool', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pool.settings) });
-      if (!settings.ok) { setFailed(true); reportSettingsSaveState('error'); return; }
+      if (!settings.ok) { mutationFailed(); return; }
       for (const account of pool.accounts) {
         const response = await runtimeFetch(`/api/omp/pool/accounts/${account.id}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ label: account.label, enabled: account.enabled, allowPaidFallback: account.allowPaidFallback }),
         });
-        if (!response.ok) { setFailed(true); reportSettingsSaveState('error'); return; }
+        if (!response.ok) { mutationFailed(); return; }
       }
       setDirty(false);
       setFailed(false);
       reportSettingsSaveState('saved');
-    } catch { setFailed(true); reportSettingsSaveState('error'); }
+      toast.success(t('settings.providers.pool.saved'));
+    } catch { mutationFailed(); }
     finally { setBusy(false); }
   };
 
@@ -86,16 +95,41 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
     reportSettingsSaveState('saving');
     try {
       const response = await runtimeFetch('/api/omp/pool/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key.trim() }) });
-      if (!response.ok) { setFailed(true); reportSettingsSaveState('error'); return; }
+      if (!response.ok) { mutationFailed(); return; }
+      const result = poolSchema.safeParse(await response.json());
+      if (!result.success) { mutationFailed(); return; }
+      setPool(result.data);
       setKey('');
       setFailed(false);
       reportSettingsSaveState('saved');
+      toast.success(t('settings.providers.pool.added'));
       onAdded?.();
-    } catch { setFailed(true); reportSettingsSaveState('error'); }
+    } catch { mutationFailed(); }
     finally { setBusy(false); }
   };
 
-  return <SettingsSection title={t('settings.providers.pool.title')} divider={false}
+  const remove = async () => {
+    if (!removeAccount || busy || dirty) return;
+    setBusy(true);
+    try {
+      const response = await runtimeFetch(`/api/omp/pool/accounts/${removeAccount.id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error();
+      const result = poolSchema.safeParse(await response.json());
+      if (!result.success) throw new Error();
+      setPool(result.data);
+      setFailed(false);
+      setRemoveAccount(null);
+      toast.success(t('settings.providers.pool.removed'));
+      onAdded?.();
+    } catch {
+      setFailed(true);
+      toast.error(t('settings.providers.pool.removeFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <><SettingsSection title={t('settings.providers.pool.title')} divider={false}
     description={t('settings.providers.pool.notice')}
     headerAction={<Button variant="outline" size="xs" disabled={busy || dirty} onClick={() => void refresh()}>{t('settings.providers.pool.refresh')}</Button>}>
     {failed && <p role="alert" className="typography-meta text-destructive">{t('settings.providers.pool.saveFailed')}</p>}
@@ -138,6 +172,11 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
             <div><dt className="inline">{t('settings.providers.pool.selected')}: </dt><dd className="inline">{date(account.lastSelected)}</dd></div>
             {account.blockedUntil !== null && <div><dt className="inline">{t('settings.providers.pool.cooldown')}: </dt><dd className="inline">{date(account.blockedUntil)}</dd></div>}
           </dl>
+          <div className="flex justify-end pt-2">
+            <Button type="button" variant="destructive" size="sm" disabled={busy || dirty} onClick={() => setRemoveAccount(account)}>
+              {t('settings.providers.pool.remove')}
+            </Button>
+          </div>
         </SettingsControlGroup>)}
         <Button type="submit" size="sm" disabled={!dirty}>{t('settings.providers.pool.save')}</Button>
       </fieldset>
@@ -148,5 +187,17 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
       </SettingsFieldRow>
       <Button type="submit" variant="outline" size="sm" disabled={busy || dirty || !key.trim()}>{t('settings.providers.pool.add')}</Button>
     </form>
-  </SettingsSection>;
+  </SettingsSection>
+  <Dialog open={removeAccount !== null} onOpenChange={open => { if (!open && !busy) setRemoveAccount(null); }}>
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>{t('settings.providers.pool.removeTitle')}</DialogTitle>
+        <DialogDescription>{t('settings.providers.pool.removeDescription', { label: removeAccount?.label || `#${removeAccount?.id ?? ''}` })}</DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="ghost" disabled={busy} onClick={() => setRemoveAccount(null)}>{t('settings.common.actions.cancel')}</Button>
+        <Button variant="destructive" size="sm" disabled={busy} onClick={() => void remove()}>{t('settings.providers.pool.remove')}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog></>;
 }

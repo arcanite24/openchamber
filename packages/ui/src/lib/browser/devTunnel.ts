@@ -135,7 +135,7 @@ export class DevTunnelUnavailableError extends Error {
   }
 }
 
-const webPreviewResponse = z.object({ url: z.string().url() });
+const webPreviewResponse = z.object({ url: z.string().url().nullable() });
 
 /**
  * Returns the URL the browser view should actually load.
@@ -165,7 +165,9 @@ export const resolveBrowsableUrl = async (url: string): Promise<string> => {
     try {
       const response = await runtimeFetch(`/api/dev-servers/preview?${new URLSearchParams({ url })}`);
       if (!response.ok) throw new DevTunnelUnavailableError(url);
-      const preview = new URL(webPreviewResponse.parse(await response.json()).url);
+      const result = webPreviewResponse.parse(await response.json());
+      if (!result.url) throw new DevTunnelUnavailableError(url);
+      const preview = new URL(result.url);
       const runtimeOrigin = new URL(hostedWeb ? window.location.href : (baseUrl || '.'), window.location.href).origin;
       if (preview.protocol !== 'https:' || preview.origin === runtimeOrigin || preview.username || preview.password || runtimeKey !== getRuntimeKey()) {
         throw new DevTunnelUnavailableError(url);
