@@ -59,10 +59,10 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
     setPool(current => current ? update(current) : current);
   };
   const date = (value: number | null) => value ? new Date(value).toLocaleString(getCurrentIntlLocale()) : t('settings.providers.pool.unknown');
-  const mutationFailed = () => {
+  const mutationFailed = (message = t('settings.providers.pool.saveFailed')) => {
     setFailed(true);
     reportSettingsSaveState('error');
-    toast.error(t('settings.providers.pool.saveFailed'));
+    toast.error(message);
   };
 
   const save = async (event: React.FormEvent) => {
@@ -95,7 +95,11 @@ export function CredentialPoolSettings({ onAdded }: { onAdded?: () => void }) {
     reportSettingsSaveState('saving');
     try {
       const response = await runtimeFetch('/api/omp/pool/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key.trim() }) });
-      if (!response.ok) { mutationFailed(); return; }
+      if (!response.ok) {
+        const duplicate = response.status === 409 && z.object({ code: z.literal('duplicate_credential') }).safeParse(await response.json()).success;
+        mutationFailed(duplicate ? t('settings.providers.pool.duplicate') : undefined);
+        return;
+      }
       const result = poolSchema.safeParse(await response.json());
       if (!result.success) { mutationFailed(); return; }
       setPool(result.data);
